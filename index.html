@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WiGLE Playback Visualizer</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="top-bar card">
+        <h1>WiGLE Observation Playback</h1>
+        <p class="subtitle">
+          Everything stays local in your browser. Note: map tiles may be fetched
+          from external providers.
+        </p>
+        <div class="upload-row">
+          <label class="btn" for="fileInput">Choose CSV</label>
+          <input id="fileInput" type="file" accept=".csv,text/csv" />
+          <div id="dropZone" class="drop-zone">or drag & drop a CSV here</div>
+        </div>
+        <div id="status" class="status">No file loaded.</div>
+      </section>
+
+      <section class="controls card">
+        <div class="control-group filters">
+          <strong>Layers</strong>
+          <label><input type="checkbox" id="filterRoute" checked /> Route</label>
+          <label><input type="checkbox" id="filterRaw" /> Raw observations</label>
+          <label><input type="checkbox" id="filterEstimated" checked /> Estimated hotspots</label>
+          <label><input type="checkbox" id="filterWifi" checked /> Wi-Fi</label>
+          <label><input type="checkbox" id="filterBluetooth" checked /> Bluetooth</label>
+          <label><input type="checkbox" id="filterCell" checked /> Cellular</label>
+        </div>
+
+        <div class="control-group thresholds">
+          <label>
+            Min confidence
+            <input id="confidenceThreshold" type="range" min="0" max="2" step="1" value="0" />
+          </label>
+          <label>
+            Min observations/device
+            <input id="obsThreshold" type="number" min="1" step="1" value="1" />
+          </label>
+        </div>
+
+        <div class="legend">
+          <strong>Confidence:</strong>
+          <span class="chip low">Low</span>
+          <span class="chip med">Medium</span>
+          <span class="chip high">High</span>
+        </div>
+
+        <div class="legend">
+          <strong>Type shape:</strong>
+          <span class="shape-chip shape-wifi"></span> Wi-Fi
+          <span class="shape-chip shape-bluetooth"></span> Bluetooth
+          <span class="shape-chip shape-cellular"></span> Cellular
+        </div>
+      </section>
+
+      <section class="map-card card">
+        <div class="map-controls">
+          <div class="control-group playback">
+            <button id="playPauseBtn" disabled>Play</button>
+            <button id="stepBackBtn" disabled title="Step to previous observation">◀ Step</button>
+            <button id="stepFwdBtn" disabled title="Step to next observation">Step ▶</button>
+            <label>
+              Speed
+              <select id="speedSelect" disabled>
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1x</option>
+                <option value="2">2x</option>
+                <option value="4">4x</option>
+                <option value="8">8x</option>
+                <option value="16">16x</option>
+                <option value="32">32x</option>
+                <option value="64">64x</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="control-group timeline-wrap">
+            <label for="timeline">Timeline</label>
+            <input id="timeline" type="range" min="0" max="0" step="1" value="0" disabled />
+            <div class="time-row">
+              <span id="timeStart">--</span>
+              <span id="timeCurrent">--</span>
+              <span id="timeEnd">--</span>
+            </div>
+          </div>
+        </div>
+        <div id="map"></div>
+      </section>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,276 @@
+:root {
+  --bg: #0f172a;
+  --panel: #111827;
+  --panel-soft: #1f2937;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #22d3ee;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: var(--text);
+  background: linear-gradient(160deg, #020617, #0f172a);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 12px;
+  padding: 12px;
+  min-height: 100vh;
+}
+
+.card {
+  background: rgba(17, 24, 39, 0.95);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.top-bar,
+.controls {
+  grid-column: 1;
+}
+
+.map-card {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-controls {
+  padding: 10px;
+  border-bottom: 1px solid #334155;
+  background: rgba(2, 6, 23, 0.55);
+  display: grid;
+  gap: 8px;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+}
+
+.subtitle {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+#fileInput {
+  display: none;
+}
+
+.btn,
+button {
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.drop-zone {
+  border: 1px dashed #64748b;
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--muted);
+  flex: 1;
+}
+
+.drop-zone.drag {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.status {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  white-space: pre-line;
+}
+
+.controls {
+  display: grid;
+  gap: 10px;
+}
+
+.control-group {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.playback {
+  grid-template-columns: repeat(3, auto) 1fr;
+  align-items: center;
+}
+
+.timeline-wrap input[type='range'] {
+  width: 100%;
+}
+
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.filters {
+  grid-template-columns: 1fr 1fr;
+}
+
+.thresholds {
+  grid-template-columns: 1fr;
+}
+
+.thresholds input[type='number'] {
+  width: 100%;
+}
+
+.legend {
+  font-size: 0.9rem;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+}
+
+.chip.low {
+  background: rgba(248, 113, 113, 0.25);
+  border: 1px solid #fca5a5;
+}
+
+.chip.med {
+  background: rgba(251, 191, 36, 0.25);
+  border: 1px solid #fcd34d;
+}
+
+.chip.high {
+  background: rgba(16, 185, 129, 0.25);
+  border: 1px solid #6ee7b7;
+}
+
+.shape-chip {
+  width: 12px;
+  height: 12px;
+  display: inline-block;
+  border: 1.5px solid #e2e8f0;
+  background: #475569;
+}
+
+.shape-wifi {
+  border-radius: 999px;
+}
+
+.shape-bluetooth {
+  transform: rotate(45deg);
+}
+
+.shape-cellular {
+  border-radius: 2px;
+}
+
+#map {
+  width: 100%;
+  height: calc(100vh - 182px);
+}
+
+.device-marker {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #e2e8f0;
+  box-sizing: border-box;
+}
+
+.device-marker.wifi {
+  border-radius: 999px;
+}
+
+.device-marker.bluetooth {
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.device-marker.cellular {
+  border-radius: 2px;
+}
+
+.device-marker.low {
+  opacity: 0.5;
+}
+
+.device-marker.medium {
+  opacity: 0.72;
+}
+
+.device-marker.high {
+  opacity: 0.95;
+}
+
+.popup-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  font-size: 0.85rem;
+}
+
+.popup-grid dt {
+  color: #cbd5e1;
+  margin: 0;
+}
+
+.popup-grid dd {
+  margin: 0;
+  color: #f8fafc;
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .map-card {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .playback {
+    grid-template-columns: repeat(2, auto);
+  }
+
+  #map {
+    height: 58vh;
+  }
+}
