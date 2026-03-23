@@ -392,31 +392,52 @@ function renderEstimatedDevices() {
     if (device.confidenceLevel < state.filters.confidenceThreshold) continue;
 
     const style = styleForConfidence(device.confidenceLevel);
-    const marker = L.circleMarker([device.estLat, device.estLon], {
-      radius: 6 + Math.min(12, Math.log2(device.obsCount + 1) * 2),
+    const marker = createEstimatedMarker(device, style);
+    marker.bindTooltip(renderDeviceTooltip(device), {
+      direction: 'top',
+      sticky: true,
+      opacity: 0.95,
+    });
+    marker.addTo(estimatedLayer);
+  }
+}
+
+function createEstimatedMarker(device, style) {
+  const center = [device.estLat, device.estLon];
+  const radius = 6 + Math.min(12, Math.log2(device.obsCount + 1) * 2);
+
+  if (device.type === 'bluetooth') {
+    return L.polygon(diamondPoints(center[0], center[1], radius), {
       color: style.stroke,
       fillColor: style.fill,
       fillOpacity: style.fillOpacity,
       weight: 2,
     });
-
-    marker.bindPopup(renderDevicePopup(device));
-    marker.addTo(estimatedLayer);
   }
+  if (device.type === 'cellular') {
+    return L.polygon(squarePoints(center[0], center[1], radius), {
+      color: style.stroke,
+      fillColor: style.fill,
+      fillOpacity: style.fillOpacity,
+      weight: 2,
+    });
+  }
+  return L.circleMarker(center, {
+    radius,
+    color: style.stroke,
+    fillColor: style.fill,
+    fillOpacity: style.fillOpacity,
+    weight: 2,
+  });
 }
 
-function renderDevicePopup(device) {
+function renderDeviceTooltip(device) {
   return `
     <dl class="popup-grid">
-      <dt>MAC</dt><dd>${escapeHtml(device.mac)}</dd>
-      <dt>SSID</dt><dd>${escapeHtml(device.ssid || '(hidden)')}</dd>
       <dt>Type</dt><dd>${escapeHtml(device.type)}</dd>
-      <dt>First seen</dt><dd>${fmtTime(device.firstSeen)}</dd>
-      <dt>Last seen</dt><dd>${fmtTime(device.lastSeen)}</dd>
+      <dt>Name</dt><dd>${escapeHtml(device.ssid || device.mac || '(unknown)')}</dd>
+      <dt>Confidence</dt><dd>${confidenceLabel(device.confidenceLevel)}</dd>
       <dt>Observations</dt><dd>${device.obsCount}</dd>
-      <dt>Confidence</dt><dd>${['Low', 'Medium', 'High'][device.confidenceLevel]}</dd>
-      <dt>Latest RSSI</dt><dd>${device.latestRssi ?? 'n/a'}</dd>
-      <dt>Estimated</dt><dd>${device.estLat.toFixed(6)}, ${device.estLon.toFixed(6)}</dd>
     </dl>
   `;
 }
@@ -432,6 +453,40 @@ function passesTypeFilter(type) {
   if (type === 'bluetooth') return state.filters.bluetooth;
   if (type === 'cellular') return state.filters.cellular;
   return true;
+}
+
+function confidenceLabel(level) {
+  return ['Low', 'Medium', 'High'][level] || 'Low';
+}
+
+function metersToLatDegrees(meters) {
+  return meters / 111320;
+}
+
+function metersToLonDegrees(meters, latitude) {
+  return meters / (111320 * Math.max(0.2, Math.cos((latitude * Math.PI) / 180)));
+}
+
+function squarePoints(lat, lon, radiusMeters) {
+  const latDelta = metersToLatDegrees(radiusMeters);
+  const lonDelta = metersToLonDegrees(radiusMeters, lat);
+  return [
+    [lat + latDelta, lon - lonDelta],
+    [lat + latDelta, lon + lonDelta],
+    [lat - latDelta, lon + lonDelta],
+    [lat - latDelta, lon - lonDelta],
+  ];
+}
+
+function diamondPoints(lat, lon, radiusMeters) {
+  const latDelta = metersToLatDegrees(radiusMeters * 1.2);
+  const lonDelta = metersToLonDegrees(radiusMeters * 1.2, lat);
+  return [
+    [lat + latDelta, lon],
+    [lat, lon + lonDelta],
+    [lat - latDelta, lon],
+    [lat, lon - lonDelta],
+  ];
 }
 
 function togglePlay() {
