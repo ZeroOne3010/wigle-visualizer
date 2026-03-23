@@ -404,31 +404,19 @@ function renderEstimatedDevices() {
 
 function createEstimatedMarker(device, style) {
   const center = [device.estLat, device.estLon];
-  const radius = 6 + Math.min(12, Math.log2(device.obsCount + 1) * 2);
-
-  if (device.type === 'bluetooth') {
-    return L.polygon(diamondPoints(center[0], center[1], radius), {
-      color: style.stroke,
-      fillColor: style.fill,
-      fillOpacity: style.fillOpacity,
-      weight: 2,
-    });
-  }
-  if (device.type === 'cellular') {
-    return L.polygon(squarePoints(center[0], center[1], radius), {
-      color: style.stroke,
-      fillColor: style.fill,
-      fillOpacity: style.fillOpacity,
-      weight: 2,
-    });
-  }
-  return L.circleMarker(center, {
-    radius,
-    color: style.stroke,
-    fillColor: style.fill,
-    fillOpacity: style.fillOpacity,
-    weight: 2,
+  const radiusPx = 6 + Math.min(12, Math.log2(device.obsCount + 1) * 2);
+  const diameterPx = Math.round(radiusPx * 2);
+  const markerType = markerTypeClass(device.type);
+  const icon = L.divIcon({
+    className: 'hotspot-wrapper',
+    iconSize: [diameterPx, diameterPx],
+    iconAnchor: [diameterPx / 2, diameterPx / 2],
+    html: `<span
+      class="hotspot-marker ${markerType}"
+      style="width:${diameterPx}px;height:${diameterPx}px;border-color:${style.stroke};background:${style.fill};opacity:${style.fillOpacity}"
+    ></span>`,
   });
+  return L.marker(center, { icon, keyboard: false });
 }
 
 function renderDeviceTooltip(device) {
@@ -459,34 +447,10 @@ function confidenceLabel(level) {
   return ['Low', 'Medium', 'High'][level] || 'Low';
 }
 
-function metersToLatDegrees(meters) {
-  return meters / 111320;
-}
-
-function metersToLonDegrees(meters, latitude) {
-  return meters / (111320 * Math.max(0.2, Math.cos((latitude * Math.PI) / 180)));
-}
-
-function squarePoints(lat, lon, radiusMeters) {
-  const latDelta = metersToLatDegrees(radiusMeters);
-  const lonDelta = metersToLonDegrees(radiusMeters, lat);
-  return [
-    [lat + latDelta, lon - lonDelta],
-    [lat + latDelta, lon + lonDelta],
-    [lat - latDelta, lon + lonDelta],
-    [lat - latDelta, lon - lonDelta],
-  ];
-}
-
-function diamondPoints(lat, lon, radiusMeters) {
-  const latDelta = metersToLatDegrees(radiusMeters * 1.2);
-  const lonDelta = metersToLonDegrees(radiusMeters * 1.2, lat);
-  return [
-    [lat + latDelta, lon],
-    [lat, lon + lonDelta],
-    [lat - latDelta, lon],
-    [lat, lon - lonDelta],
-  ];
+function markerTypeClass(type) {
+  if (type === 'bluetooth') return 'hotspot-marker--bluetooth';
+  if (type === 'cellular') return 'hotspot-marker--cellular';
+  return 'hotspot-marker--wifi';
 }
 
 function togglePlay() {

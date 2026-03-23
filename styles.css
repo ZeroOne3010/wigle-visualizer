@@ -232,6 +232,31 @@ button:disabled {
   color: #f8fafc;
 }
 
+.hotspot-wrapper {
+  background: transparent;
+  border: 0;
+}
+
+.hotspot-marker {
+  display: inline-block;
+  box-sizing: border-box;
+  border-width: 2px;
+  border-style: solid;
+}
+
+.hotspot-marker--wifi {
+  border-radius: 50%;
+}
+
+.hotspot-marker--bluetooth {
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+
+.hotspot-marker--cellular {
+  border-radius: 2px;
+}
+
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
