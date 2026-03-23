@@ -392,31 +392,40 @@ function renderEstimatedDevices() {
     if (device.confidenceLevel < state.filters.confidenceThreshold) continue;
 
     const style = styleForConfidence(device.confidenceLevel);
-    const marker = L.circleMarker([device.estLat, device.estLon], {
-      radius: 6 + Math.min(12, Math.log2(device.obsCount + 1) * 2),
-      color: style.stroke,
-      fillColor: style.fill,
-      fillOpacity: style.fillOpacity,
-      weight: 2,
+    const marker = createEstimatedMarker(device, style);
+    marker.bindTooltip(renderDeviceTooltip(device), {
+      direction: 'top',
+      sticky: true,
+      opacity: 0.95,
     });
-
-    marker.bindPopup(renderDevicePopup(device));
     marker.addTo(estimatedLayer);
   }
 }
 
-function renderDevicePopup(device) {
+function createEstimatedMarker(device, style) {
+  const center = [device.estLat, device.estLon];
+  const radiusPx = 6 + Math.min(12, Math.log2(device.obsCount + 1) * 2);
+  const diameterPx = Math.round(radiusPx * 2);
+  const markerType = markerTypeClass(device.type);
+  const icon = L.divIcon({
+    className: 'hotspot-wrapper',
+    iconSize: [diameterPx, diameterPx],
+    iconAnchor: [diameterPx / 2, diameterPx / 2],
+    html: `<span
+      class="hotspot-marker ${markerType}"
+      style="width:${diameterPx}px;height:${diameterPx}px;border-color:${style.stroke};background:${style.fill};opacity:${style.fillOpacity}"
+    ></span>`,
+  });
+  return L.marker(center, { icon, keyboard: false });
+}
+
+function renderDeviceTooltip(device) {
   return `
     <dl class="popup-grid">
-      <dt>MAC</dt><dd>${escapeHtml(device.mac)}</dd>
-      <dt>SSID</dt><dd>${escapeHtml(device.ssid || '(hidden)')}</dd>
       <dt>Type</dt><dd>${escapeHtml(device.type)}</dd>
-      <dt>First seen</dt><dd>${fmtTime(device.firstSeen)}</dd>
-      <dt>Last seen</dt><dd>${fmtTime(device.lastSeen)}</dd>
+      <dt>Name</dt><dd>${escapeHtml(device.ssid || device.mac || '(unknown)')}</dd>
+      <dt>Confidence</dt><dd>${confidenceLabel(device.confidenceLevel)}</dd>
       <dt>Observations</dt><dd>${device.obsCount}</dd>
-      <dt>Confidence</dt><dd>${['Low', 'Medium', 'High'][device.confidenceLevel]}</dd>
-      <dt>Latest RSSI</dt><dd>${device.latestRssi ?? 'n/a'}</dd>
-      <dt>Estimated</dt><dd>${device.estLat.toFixed(6)}, ${device.estLon.toFixed(6)}</dd>
     </dl>
   `;
 }
@@ -432,6 +441,16 @@ function passesTypeFilter(type) {
   if (type === 'bluetooth') return state.filters.bluetooth;
   if (type === 'cellular') return state.filters.cellular;
   return true;
+}
+
+function confidenceLabel(level) {
+  return ['Low', 'Medium', 'High'][level] || 'Low';
+}
+
+function markerTypeClass(type) {
+  if (type === 'bluetooth') return 'hotspot-marker--bluetooth';
+  if (type === 'cellular') return 'hotspot-marker--cellular';
+  return 'hotspot-marker--wifi';
 }
 
 function togglePlay() {

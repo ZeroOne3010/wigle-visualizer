@@ -29,23 +29,6 @@
       </section>
 
       <section class="controls card">
-        <div class="control-group playback">
-          <button id="playPauseBtn" disabled>Play</button>
-          <button id="stepBackBtn" disabled title="Step to previous observation">◀ Step</button>
-          <button id="stepFwdBtn" disabled title="Step to next observation">Step ▶</button>
-          <label>
-            Speed
-            <select id="speedSelect" disabled>
-              <option value="0.25">0.25x</option>
-              <option value="0.5">0.5x</option>
-              <option value="1" selected>1x</option>
-              <option value="2">2x</option>
-              <option value="4">4x</option>
-              <option value="8">8x</option>
-            </select>
-          </label>
-        </div>
-
         <div class="control-group timeline-wrap">
           <label for="timeline">Timeline</label>
           <input id="timeline" type="range" min="0" max="0" step="1" value="0" disabled />
@@ -86,6 +69,33 @@
       </section>
 
       <section class="map-card card">
+        <div class="map-controls control-group playback">
+          <button id="playPauseBtn" disabled>Play</button>
+          <button id="stepBackBtn" disabled title="Step to previous observation">◀ Step</button>
+          <button id="stepFwdBtn" disabled title="Step to next observation">Step ▶</button>
+          <label>
+            Speed
+            <select id="speedSelect" disabled>
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+              <option value="4">4x</option>
+              <option value="8">8x</option>
+              <option value="16">16x</option>
+              <option value="32">32x</option>
+              <option value="64">64x</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="type-legend legend">
+          <strong>Type legend:</strong>
+          <span class="shape-item"><span class="shape wifi"></span>Wi-Fi</span>
+          <span class="shape-item"><span class="shape bluetooth"></span>Bluetooth</span>
+          <span class="shape-item"><span class="shape cellular"></span>Cellular</span>
+        </div>
+
         <div id="map"></div>
       </section>
     </main>
