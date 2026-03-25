@@ -271,3 +271,15 @@ button:disabled {
     height: 60vh;
   }
 }
+
+
+.leaflet-tooltip.device-tooltip {
+  background: rgba(2, 6, 23, 0.94);
+  border: 1px solid #334155;
+  color: #f8fafc;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.45);
+}
+
+.leaflet-tooltip.device-tooltip::before {
+  border-top-color: #334155;
+}
