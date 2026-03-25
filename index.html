@@ -29,16 +29,6 @@
       </section>
 
       <section class="controls card">
-        <div class="control-group timeline-wrap">
-          <label for="timeline">Timeline</label>
-          <input id="timeline" type="range" min="0" max="0" step="1" value="0" disabled />
-          <div class="time-row">
-            <span id="timeStart">--</span>
-            <span id="timeCurrent">--</span>
-            <span id="timeEnd">--</span>
-          </div>
-        </div>
-
         <div class="control-group filters">
           <strong>Layers</strong>
           <label><input type="checkbox" id="filterRoute" checked /> Route</label>
@@ -87,6 +77,16 @@
               <option value="64">64x</option>
             </select>
           </label>
+        </div>
+
+        <div class="control-group timeline-wrap timeline-wrap--map">
+          <label for="timeline">Timeline</label>
+          <input id="timeline" type="range" min="0" max="0" step="1" value="0" disabled />
+          <div class="time-row">
+            <span id="timeStart">--</span>
+            <span id="timeCurrent">--</span>
+            <span id="timeEnd">--</span>
+          </div>
         </div>
 
         <div class="type-legend legend">
