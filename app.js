@@ -394,6 +394,7 @@ function renderEstimatedDevices() {
     const style = styleForConfidence(device.confidenceLevel);
     const marker = createEstimatedMarker(device, style);
     marker.bindTooltip(renderDeviceTooltip(device), {
+      className: 'device-tooltip',
       direction: 'top',
       sticky: true,
       opacity: 0.95,
@@ -420,12 +421,19 @@ function createEstimatedMarker(device, style) {
 }
 
 function renderDeviceTooltip(device) {
+  const typeLabel = device.type ? String(device.type) : 'Unknown';
+  const displayName = device.ssid || device.mac || 'Unknown';
+  const confidence = Number.isFinite(device.confidenceLevel)
+    ? confidenceLabel(device.confidenceLevel)
+    : 'Unknown';
+  const observations = Number.isFinite(device.obsCount) ? String(device.obsCount) : '0';
+
   return `
     <dl class="popup-grid">
-      <dt>Type</dt><dd>${escapeHtml(device.type)}</dd>
-      <dt>Name</dt><dd>${escapeHtml(device.ssid || device.mac || '(unknown)')}</dd>
-      <dt>Confidence</dt><dd>${confidenceLabel(device.confidenceLevel)}</dd>
-      <dt>Observations</dt><dd>${device.obsCount}</dd>
+      <dt>Type</dt><dd>${escapeHtml(typeLabel)}</dd>
+      <dt>Name</dt><dd>${escapeHtml(displayName)}</dd>
+      <dt>Confidence</dt><dd>${escapeHtml(confidence)}</dd>
+      <dt>Observations</dt><dd>${escapeHtml(observations)}</dd>
     </dl>
   `;
 }
