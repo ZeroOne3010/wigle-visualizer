@@ -46,6 +46,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
 }
 
 h1 {
@@ -181,7 +182,9 @@ button:disabled {
 
 #map {
   width: 100%;
-  height: calc(100vh - 130px);
+  flex: 1 1 auto;
+  min-height: 320px;
+  height: auto;
   border-radius: 8px;
 }
 
@@ -268,7 +271,7 @@ button:disabled {
   }
 
   #map {
-    height: 60vh;
+    min-height: 50vh;
   }
 }
 
