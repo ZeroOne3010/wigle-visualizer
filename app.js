@@ -356,6 +356,7 @@ function calcWeight(obs) {
 }
 
 function computeConfidence(device) {
+  if (device.obsCount <= 1) return 0;
   const countScore = Math.min(1, device.obsCount / 8);
   const spreadAvg = device.obsCount ? device.varianceAccumulator / device.obsCount : 999;
   const spreadScore = spreadAvg < 20 ? 1 : spreadAvg < 60 ? 0.6 : 0.3;
@@ -414,7 +415,7 @@ function renderEstimatedDevices() {
   for (const device of state.deviceState.values()) {
     if (!passesTypeFilter(device.type)) continue;
     if (device.obsCount < state.filters.minObs) continue;
-    if (device.confidenceLevel < state.filters.confidenceThreshold) continue;
+    if (!device.isMobile && device.confidenceLevel < state.filters.confidenceThreshold) continue;
     if (device.isMobile && !state.filters.mobile) continue;
     if (!device.isMobile && !state.filters.stationary) continue;
 
@@ -458,7 +459,7 @@ function renderEstimatedDevices() {
 function createMobileTrackLine(device) {
   const latLngs = buildTrackLatLngs(device.trackPoints || []);
   const isSelected = device.mac === state.selectedDeviceMac;
-  const style = lineStyleForConfidence(device.confidenceLevel, isSelected);
+  const style = lineStyleForMobility(isSelected);
   return L.polyline(latLngs, style);
 }
 
@@ -498,7 +499,9 @@ function createEstimatedMarker(device, style) {
 function renderDeviceTooltip(device) {
   const typeLabel = device.type ? String(device.type) : 'Unknown';
   const displayName = device.ssid || device.mac || 'Unknown';
-  const confidence = Number.isFinite(device.confidenceLevel)
+  const confidence = device.isMobile
+    ? 'N/A (moving)'
+    : Number.isFinite(device.confidenceLevel)
     ? confidenceLabel(device.confidenceLevel)
     : 'Unknown';
   const observations = Number.isFinite(device.obsCount) ? String(device.obsCount) : '0';
@@ -528,13 +531,11 @@ function styleForConfidence(level) {
   return { stroke: '#ef4444', fill: '#f87171', fillOpacity: 0.3 };
 }
 
-function lineStyleForConfidence(level, selected) {
+function lineStyleForMobility(selected) {
   if (selected) {
     return { color: '#22d3ee', weight: 7, opacity: 1, lineCap: 'round', lineJoin: 'round' };
   }
-  if (level === 2) return { color: '#34d399', weight: 4, opacity: 0.8, lineCap: 'round', lineJoin: 'round' };
-  if (level === 1) return { color: '#fbbf24', weight: 4, opacity: 0.75, lineCap: 'round', lineJoin: 'round' };
-  return { color: '#f87171', weight: 3, opacity: 0.68, lineCap: 'round', lineJoin: 'round' };
+  return { color: '#94a3b8', weight: 3, opacity: 0.72, lineCap: 'round', lineJoin: 'round' };
 }
 
 function passesTypeFilter(type) {
