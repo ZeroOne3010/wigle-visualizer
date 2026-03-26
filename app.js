@@ -417,14 +417,14 @@ function renderEstimatedDevices() {
   estimatedLayer.clearLayers();
   if (!state.filters.estimated) return;
 
+  const selectedTrailVisible = isSelectedTrailVisible();
+  if (state.selectedDeviceMac && !selectedTrailVisible) {
+    state.selectedDeviceMac = null;
+  }
+
   const hasSelectedTrail = Boolean(state.selectedDeviceMac);
-  let selectedVisible = false;
   for (const device of state.deviceState.values()) {
-    if (!passesTypeFilter(device.type)) continue;
-    if (device.obsCount < state.filters.minObs) continue;
-    if (!device.isMobile && effectiveConfidenceLevel(device) < state.filters.confidenceThreshold) continue;
-    if (device.isMobile && !state.filters.mobile) continue;
-    if (!device.isMobile && !state.filters.stationary) continue;
+    if (!passesEstimatedDeviceFilters(device)) continue;
 
     if (device.isMobile) {
       const line = createMobileTrackLine(device, hasSelectedTrail);
@@ -440,7 +440,6 @@ function renderEstimatedDevices() {
 
       if (device.mac === state.selectedDeviceMac) {
         line.bringToFront();
-        selectedVisible = true;
       }
       continue;
     }
@@ -452,10 +451,22 @@ function renderEstimatedDevices() {
     });
     marker.addTo(estimatedLayer);
   }
+}
 
-  if (!selectedVisible) {
-    state.selectedDeviceMac = null;
-  }
+function isSelectedTrailVisible() {
+  if (!state.selectedDeviceMac) return false;
+  const selectedDevice = state.deviceState.get(state.selectedDeviceMac);
+  if (!selectedDevice || !selectedDevice.isMobile) return false;
+  return passesEstimatedDeviceFilters(selectedDevice);
+}
+
+function passesEstimatedDeviceFilters(device) {
+  if (!passesTypeFilter(device.type)) return false;
+  if (device.obsCount < state.filters.minObs) return false;
+  if (!device.isMobile && effectiveConfidenceLevel(device) < state.filters.confidenceThreshold) return false;
+  if (device.isMobile && !state.filters.mobile) return false;
+  if (!device.isMobile && !state.filters.stationary) return false;
+  return true;
 }
 
 function createMobileTrackLine(device, hasSelectedTrail) {
