@@ -356,13 +356,19 @@ function calcWeight(obs) {
 }
 
 function computeConfidence(device) {
-  if (device.obsCount <= 1) return 0;
-  const countScore = Math.min(1, device.obsCount / 8);
-  const spreadAvg = device.obsCount ? device.varianceAccumulator / device.obsCount : 999;
+  const obsCount = Number(device.obsCount) || 0;
+  if (obsCount < 2) return 0;
+
+  const countScore = Math.min(1, obsCount / 8);
+  const spreadAvg = obsCount ? device.varianceAccumulator / obsCount : 999;
   const spreadScore = spreadAvg < 20 ? 1 : spreadAvg < 60 ? 0.6 : 0.3;
   const gpsScore = device.latestAccuracy < 15 ? 1 : device.latestAccuracy < 40 ? 0.65 : 0.35;
   const total = countScore * 0.45 + spreadScore * 0.35 + gpsScore * 0.2;
   return total > 0.75 ? 2 : total > 0.45 ? 1 : 0;
+}
+
+function effectiveConfidenceLevel(device) {
+  return (Number(device.obsCount) || 0) < 2 ? 0 : Number(device.confidenceLevel) || 0;
 }
 
 function redrawRoute() {
@@ -415,7 +421,7 @@ function renderEstimatedDevices() {
   for (const device of state.deviceState.values()) {
     if (!passesTypeFilter(device.type)) continue;
     if (device.obsCount < state.filters.minObs) continue;
-    if (!device.isMobile && device.confidenceLevel < state.filters.confidenceThreshold) continue;
+    if (!device.isMobile && effectiveConfidenceLevel(device) < state.filters.confidenceThreshold) continue;
     if (device.isMobile && !state.filters.mobile) continue;
     if (!device.isMobile && !state.filters.stationary) continue;
 
@@ -440,7 +446,7 @@ function renderEstimatedDevices() {
       continue;
     }
 
-    const style = styleForConfidence(device.confidenceLevel);
+    const style = styleForConfidence(effectiveConfidenceLevel(device));
     const marker = createEstimatedMarker(device, style);
     marker.bindTooltip(renderDeviceTooltip(device), {
       className: 'device-tooltip',
@@ -459,8 +465,10 @@ function renderEstimatedDevices() {
 function createMobileTrackLine(device) {
   const latLngs = buildTrackLatLngs(device.trackPoints || []);
   const isSelected = device.mac === state.selectedDeviceMac;
-  const style = lineStyleForMobility(isSelected);
-  return L.polyline(latLngs, style);
+  const style = lineStyleForMobility(device.mac, isSelected);
+  const outline = L.polyline(latLngs, style.outline);
+  const core = L.polyline(latLngs, style.core);
+  return L.featureGroup([outline, core]);
 }
 
 function buildTrackLatLngs(trackPoints) {
@@ -502,7 +510,7 @@ function renderDeviceTooltip(device) {
   const confidence = device.isMobile
     ? 'N/A (moving)'
     : Number.isFinite(device.confidenceLevel)
-    ? confidenceLabel(device.confidenceLevel)
+    ? confidenceLabel(effectiveConfidenceLevel(device))
     : 'Unknown';
   const observations = Number.isFinite(device.obsCount) ? String(device.obsCount) : '0';
   const mobility = device.isMobile ? 'Mobile' : 'Stationary';
@@ -531,11 +539,28 @@ function styleForConfidence(level) {
   return { stroke: '#ef4444', fill: '#f87171', fillOpacity: 0.3 };
 }
 
-function lineStyleForMobility(selected) {
+function lineStyleForMobility(mac, selected) {
   if (selected) {
-    return { color: '#22d3ee', weight: 7, opacity: 1, lineCap: 'round', lineJoin: 'round' };
+    return {
+      outline: { color: '#0f172a', weight: 2.6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' },
+      core: { color: '#22d3ee', weight: 1.4, opacity: 1, lineCap: 'round', lineJoin: 'round' },
+    };
   }
-  return { color: '#94a3b8', weight: 3, opacity: 0.72, lineCap: 'round', lineJoin: 'round' };
+
+  return {
+    outline: { color: '#0b1224', weight: 2.2, opacity: 0.58, lineCap: 'round', lineJoin: 'round' },
+    core: { color: mobileShadeForDevice(mac), weight: 1.2, opacity: 0.92, lineCap: 'round', lineJoin: 'round' },
+  };
+}
+
+function mobileShadeForDevice(mac) {
+  const shades = ['#cbd5e1', '#b6c2d1', '#a5b4c8', '#94a3b8', '#7f90a8', '#6f8199'];
+  const key = String(mac || '');
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return shades[hash % shades.length];
 }
 
 function passesTypeFilter(type) {
