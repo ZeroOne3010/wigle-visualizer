@@ -417,58 +417,66 @@ function renderEstimatedDevices() {
   estimatedLayer.clearLayers();
   if (!state.filters.estimated) return;
 
-  let selectedVisible = false;
+  const selectedTrailVisible = isSelectedTrailVisible();
+  if (state.selectedDeviceMac && !selectedTrailVisible) {
+    state.selectedDeviceMac = null;
+  }
+
+  const hasSelectedTrail = Boolean(state.selectedDeviceMac);
   for (const device of state.deviceState.values()) {
-    if (!passesTypeFilter(device.type)) continue;
-    if (device.obsCount < state.filters.minObs) continue;
-    if (!device.isMobile && effectiveConfidenceLevel(device) < state.filters.confidenceThreshold) continue;
-    if (device.isMobile && !state.filters.mobile) continue;
-    if (!device.isMobile && !state.filters.stationary) continue;
+    if (!passesEstimatedDeviceFilters(device)) continue;
 
     if (device.isMobile) {
-      const line = createMobileTrackLine(device);
-      line.bindTooltip(renderDeviceTooltip(device), {
-        className: 'device-tooltip',
-        direction: 'top',
-        sticky: true,
-        opacity: 0.95,
-      });
-      line.on('click', () => {
-        state.selectedDeviceMac = device.mac;
+      const line = createMobileTrackLine(device, hasSelectedTrail);
+      line.on('click', (event) => {
+        state.selectedDeviceMac = state.selectedDeviceMac === device.mac ? null : device.mac;
+        L.popup({ className: 'device-tooltip' })
+          .setLatLng(event.latlng)
+          .setContent(renderDeviceTooltip(device))
+          .openOn(map);
         renderEstimatedDevices();
       });
       line.addTo(estimatedLayer);
 
       if (device.mac === state.selectedDeviceMac) {
         line.bringToFront();
-        selectedVisible = true;
       }
       continue;
     }
 
     const style = styleForConfidence(effectiveConfidenceLevel(device));
     const marker = createEstimatedMarker(device, style);
-    marker.bindTooltip(renderDeviceTooltip(device), {
+    marker.bindPopup(renderDeviceTooltip(device), {
       className: 'device-tooltip',
-      direction: 'top',
-      sticky: true,
-      opacity: 0.95,
     });
     marker.addTo(estimatedLayer);
   }
-
-  if (!selectedVisible) {
-    state.selectedDeviceMac = null;
-  }
 }
 
-function createMobileTrackLine(device) {
+function isSelectedTrailVisible() {
+  if (!state.selectedDeviceMac) return false;
+  const selectedDevice = state.deviceState.get(state.selectedDeviceMac);
+  if (!selectedDevice || !selectedDevice.isMobile) return false;
+  return passesEstimatedDeviceFilters(selectedDevice);
+}
+
+function passesEstimatedDeviceFilters(device) {
+  if (!passesTypeFilter(device.type)) return false;
+  if (device.obsCount < state.filters.minObs) return false;
+  if (!device.isMobile && effectiveConfidenceLevel(device) < state.filters.confidenceThreshold) return false;
+  if (device.isMobile && !state.filters.mobile) return false;
+  if (!device.isMobile && !state.filters.stationary) return false;
+  return true;
+}
+
+function createMobileTrackLine(device, hasSelectedTrail) {
   const latLngs = buildTrackLatLngs(device.trackPoints || []);
   const isSelected = device.mac === state.selectedDeviceMac;
-  const style = lineStyleForMobility(device.mac, isSelected);
+  const style = lineStyleForMobility(device.mac, isSelected, hasSelectedTrail);
+  const hitTarget = L.polyline(latLngs, style.hitTarget);
   const outline = L.polyline(latLngs, style.outline);
   const core = L.polyline(latLngs, style.core);
-  return L.featureGroup([outline, core]);
+  return L.featureGroup([hitTarget, outline, core]);
 }
 
 function buildTrackLatLngs(trackPoints) {
@@ -539,17 +547,32 @@ function styleForConfidence(level) {
   return { stroke: '#ef4444', fill: '#f87171', fillOpacity: 0.3 };
 }
 
-function lineStyleForMobility(mac, selected) {
+function lineStyleForMobility(mac, selected, hasSelectedTrail) {
   if (selected) {
     return {
+      hitTarget: { color: '#000', weight: 16, opacity: 0, lineCap: 'round', lineJoin: 'round' },
       outline: { color: '#0f172a', weight: 2.6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' },
       core: { color: '#22d3ee', weight: 1.4, opacity: 1, lineCap: 'round', lineJoin: 'round' },
     };
   }
 
+  const faded = hasSelectedTrail;
   return {
-    outline: { color: '#0b1224', weight: 2.2, opacity: 0.58, lineCap: 'round', lineJoin: 'round' },
-    core: { color: mobileShadeForDevice(mac), weight: 1.2, opacity: 0.92, lineCap: 'round', lineJoin: 'round' },
+    hitTarget: { color: '#000', weight: 14, opacity: 0, lineCap: 'round', lineJoin: 'round' },
+    outline: {
+      color: '#0b1224',
+      weight: 2.2,
+      opacity: faded ? 0.16 : 0.58,
+      lineCap: 'round',
+      lineJoin: 'round',
+    },
+    core: {
+      color: mobileShadeForDevice(mac),
+      weight: 1.2,
+      opacity: faded ? 0.24 : 0.92,
+      lineCap: 'round',
+      lineJoin: 'round',
+    },
   };
 }
 
