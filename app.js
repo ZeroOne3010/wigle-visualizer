@@ -13,6 +13,7 @@ const state = {
     route: true,
     raw: false,
     estimated: true,
+    stationaryOnly: true,
     wifi: true,
     bluetooth: true,
     cellular: true,
@@ -37,6 +38,7 @@ const els = {
   filterRoute: document.getElementById('filterRoute'),
   filterRaw: document.getElementById('filterRaw'),
   filterEstimated: document.getElementById('filterEstimated'),
+  filterStationaryOnly: document.getElementById('filterStationaryOnly'),
   filterWifi: document.getElementById('filterWifi'),
   filterBluetooth: document.getElementById('filterBluetooth'),
   filterCell: document.getElementById('filterCell'),
@@ -115,6 +117,10 @@ function wireEvents() {
   });
   els.filterEstimated.addEventListener('change', () => {
     state.filters.estimated = els.filterEstimated.checked;
+    renderEstimatedDevices();
+  });
+  els.filterStationaryOnly.addEventListener('change', () => {
+    state.filters.stationaryOnly = els.filterStationaryOnly.checked;
     renderEstimatedDevices();
   });
   els.filterWifi.addEventListener('change', () => {
@@ -299,9 +305,18 @@ function applyObservation(obs, deviceMap) {
   existing.latestAccuracy = obs.accuracy;
   if (!existing.ssid && obs.ssid) existing.ssid = obs.ssid;
 
+  const spanFromOrigin = distanceMeters(
+    existing.originLat,
+    existing.originLon,
+    obs.latitude,
+    obs.longitude
+  );
+  existing.trackSpanMeters = Math.max(existing.trackSpanMeters, spanFromOrigin);
+
   const spread = distanceMeters(existing.estLat, existing.estLon, obs.latitude, obs.longitude);
   existing.varianceAccumulator += spread;
   existing.confidenceLevel = computeConfidence(existing);
+  existing.isMobile = isMobileDevice(existing);
 
   deviceMap.set(obs.mac, existing);
 }
@@ -315,12 +330,16 @@ function createNewDevice(obs) {
     lastSeen: obs.timestamp,
     estLat: obs.latitude,
     estLon: obs.longitude,
+    originLat: obs.latitude,
+    originLon: obs.longitude,
     totalWeight: 0,
     obsCount: 0,
     varianceAccumulator: 0,
+    trackSpanMeters: 0,
     latestRssi: obs.rssi,
     latestAccuracy: obs.accuracy,
     confidenceLevel: 0,
+    isMobile: false,
   };
 }
 
@@ -390,6 +409,7 @@ function renderEstimatedDevices() {
     if (!passesTypeFilter(device.type)) continue;
     if (device.obsCount < state.filters.minObs) continue;
     if (device.confidenceLevel < state.filters.confidenceThreshold) continue;
+    if (state.filters.stationaryOnly && device.isMobile) continue;
 
     const style = styleForConfidence(device.confidenceLevel);
     const marker = createEstimatedMarker(device, style);
@@ -427,15 +447,24 @@ function renderDeviceTooltip(device) {
     ? confidenceLabel(device.confidenceLevel)
     : 'Unknown';
   const observations = Number.isFinite(device.obsCount) ? String(device.obsCount) : '0';
+  const mobility = device.isMobile ? 'Mobile' : 'Stationary';
+  const trackSpan = `${Math.round(device.trackSpanMeters || 0)} m`;
 
   return `
     <dl class="popup-grid">
       <dt>Type</dt><dd>${escapeHtml(typeLabel)}</dd>
       <dt>Name</dt><dd>${escapeHtml(displayName)}</dd>
+      <dt>Mobility</dt><dd>${escapeHtml(mobility)}</dd>
+      <dt>Track span</dt><dd>${escapeHtml(trackSpan)}</dd>
       <dt>Confidence</dt><dd>${escapeHtml(confidence)}</dd>
       <dt>Observations</dt><dd>${escapeHtml(observations)}</dd>
     </dl>
   `;
+}
+
+function isMobileDevice(device) {
+  const spreadAvg = device.obsCount ? device.varianceAccumulator / device.obsCount : 0;
+  return device.trackSpanMeters > 120 || spreadAvg > 80;
 }
 
 function styleForConfidence(level) {
