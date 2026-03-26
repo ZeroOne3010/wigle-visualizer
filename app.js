@@ -233,6 +233,7 @@ function cloneDeviceState(deviceMap) {
       obsCount: d.obsCount,
       firstSeen: d.firstSeen,
       lastSeen: d.lastSeen,
+      trackPoints: (d.trackPoints || []).map((point) => ({ ...point })),
     });
   }
   return copy;
@@ -305,13 +306,11 @@ function applyObservation(obs, deviceMap) {
   existing.latestAccuracy = obs.accuracy;
   if (!existing.ssid && obs.ssid) existing.ssid = obs.ssid;
 
-  const spanFromOrigin = distanceMeters(
-    existing.originLat,
-    existing.originLon,
-    obs.latitude,
-    obs.longitude
-  );
-  existing.trackSpanMeters = Math.max(existing.trackSpanMeters, spanFromOrigin);
+  for (const point of existing.trackPoints) {
+    const span = distanceMeters(point.lat, point.lon, obs.latitude, obs.longitude);
+    existing.trackSpanMeters = Math.max(existing.trackSpanMeters, span);
+  }
+  existing.trackPoints.push({ lat: obs.latitude, lon: obs.longitude });
 
   const spread = distanceMeters(existing.estLat, existing.estLon, obs.latitude, obs.longitude);
   existing.varianceAccumulator += spread;
@@ -330,12 +329,11 @@ function createNewDevice(obs) {
     lastSeen: obs.timestamp,
     estLat: obs.latitude,
     estLon: obs.longitude,
-    originLat: obs.latitude,
-    originLon: obs.longitude,
     totalWeight: 0,
     obsCount: 0,
     varianceAccumulator: 0,
     trackSpanMeters: 0,
+    trackPoints: [{ lat: obs.latitude, lon: obs.longitude }],
     latestRssi: obs.rssi,
     latestAccuracy: obs.accuracy,
     confidenceLevel: 0,
