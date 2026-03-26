@@ -23,6 +23,8 @@ const state = {
   },
   deviceState: new Map(),
   selectedDeviceMac: null,
+  viewportSortKey: 'lastSeen',
+  viewportSortDir: 'desc',
 };
 
 const els = {
@@ -47,6 +49,15 @@ const els = {
   filterCell: document.getElementById('filterCell'),
   confidenceThreshold: document.getElementById('confidenceThreshold'),
   obsThreshold: document.getElementById('obsThreshold'),
+  viewportSummary: document.getElementById('viewportSummary'),
+  summaryVisibleTotal: document.getElementById('summaryVisibleTotal'),
+  summaryVisibleStationary: document.getElementById('summaryVisibleStationary'),
+  summaryVisibleMobile: document.getElementById('summaryVisibleMobile'),
+  summaryVisibleWifi: document.getElementById('summaryVisibleWifi'),
+  summaryVisibleBluetooth: document.getElementById('summaryVisibleBluetooth'),
+  summaryVisibleCellular: document.getElementById('summaryVisibleCellular'),
+  viewportTableBody: document.getElementById('viewportTableBody'),
+  viewportTableHeaders: Array.from(document.querySelectorAll('#viewportTable thead [data-sort]')),
 };
 
 const map = L.map('map', { preferCanvas: true }).setView([37.7749, -122.4194], 12);
@@ -113,43 +124,85 @@ function wireEvents() {
   els.filterRoute.addEventListener('change', () => {
     state.filters.route = els.filterRoute.checked;
     redrawRoute();
+    renderViewportPanel();
   });
   els.filterRaw.addEventListener('change', () => {
     state.filters.raw = els.filterRaw.checked;
     renderRawPoints();
+    renderViewportPanel();
   });
   els.filterEstimated.addEventListener('change', () => {
     state.filters.estimated = els.filterEstimated.checked;
     renderEstimatedDevices();
+    renderViewportPanel();
   });
   els.filterStationary.addEventListener('change', () => {
     state.filters.stationary = els.filterStationary.checked;
     renderEstimatedDevices();
+    renderViewportPanel();
   });
   els.filterMobile.addEventListener('change', () => {
     state.filters.mobile = els.filterMobile.checked;
     renderEstimatedDevices();
+    renderViewportPanel();
   });
   els.filterWifi.addEventListener('change', () => {
     state.filters.wifi = els.filterWifi.checked;
     refreshAllLayers();
+    renderViewportPanel();
   });
   els.filterBluetooth.addEventListener('change', () => {
     state.filters.bluetooth = els.filterBluetooth.checked;
     refreshAllLayers();
+    renderViewportPanel();
   });
   els.filterCell.addEventListener('change', () => {
     state.filters.cellular = els.filterCell.checked;
     refreshAllLayers();
+    renderViewportPanel();
   });
   els.confidenceThreshold.addEventListener('input', () => {
     state.filters.confidenceThreshold = Number(els.confidenceThreshold.value);
     renderEstimatedDevices();
+    renderViewportPanel();
   });
   els.obsThreshold.addEventListener('input', () => {
     state.filters.minObs = Math.max(1, Number(els.obsThreshold.value) || 1);
     renderEstimatedDevices();
+    renderViewportPanel();
   });
+
+  for (const header of els.viewportTableHeaders) {
+    header.addEventListener('click', () => {
+      const sortKey = header.dataset.sort;
+      if (!sortKey) return;
+      if (state.viewportSortKey === sortKey) {
+        state.viewportSortDir = state.viewportSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.viewportSortKey = sortKey;
+        state.viewportSortDir = 'asc';
+      }
+      renderViewportPanel();
+    });
+  }
+
+  const debouncedMapViewportUpdate = debounce(() => {
+    renderEstimatedDevices();
+    renderViewportPanel();
+  }, 150);
+  map.on('moveend', debouncedMapViewportUpdate);
+  map.on('zoomend', debouncedMapViewportUpdate);
+}
+
+function debounce(fn, waitMs = 150) {
+  let timeoutId = null;
+  return (...args) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      timeoutId = null;
+      fn(...args);
+    }, waitMs);
+  };
 }
 
 async function parseFile(file) {
@@ -265,6 +318,7 @@ function seekToTime(targetTime) {
   redrawRoute();
   renderRawPoints();
   renderEstimatedDevices();
+  renderViewportPanel();
 }
 
 function advanceForward(targetTime) {
@@ -417,15 +471,16 @@ function renderEstimatedDevices() {
   estimatedLayer.clearLayers();
   if (!state.filters.estimated) return;
 
-  const selectedTrailVisible = isSelectedTrailVisible();
+  const visibleDevices = getVisibleEstimatedDevices();
+  const selectedTrailVisible = visibleDevices.some(
+    (device) => device.mac === state.selectedDeviceMac && device.isMobile
+  );
   if (state.selectedDeviceMac && !selectedTrailVisible) {
     state.selectedDeviceMac = null;
   }
 
   const hasSelectedTrail = Boolean(state.selectedDeviceMac);
-  for (const device of state.deviceState.values()) {
-    if (!passesEstimatedDeviceFilters(device)) continue;
-
+  for (const device of visibleDevices) {
     if (device.isMobile) {
       const line = createMobileTrackLine(device, hasSelectedTrail);
       line.on('click', (event) => {
@@ -453,11 +508,143 @@ function renderEstimatedDevices() {
   }
 }
 
-function isSelectedTrailVisible() {
-  if (!state.selectedDeviceMac) return false;
-  const selectedDevice = state.deviceState.get(state.selectedDeviceMac);
-  if (!selectedDevice || !selectedDevice.isMobile) return false;
-  return passesEstimatedDeviceFilters(selectedDevice);
+function getVisibleEstimatedDevices(
+  deviceValues = state.deviceState.values(),
+  bounds = map.getBounds()
+) {
+  if (!state.filters.estimated) return [];
+  const visibleDevices = [];
+  for (const device of deviceValues) {
+    if (!passesEstimatedDeviceFilters(device)) continue;
+    if (!isDeviceInViewport(device, bounds)) continue;
+    visibleDevices.push(device);
+  }
+  return visibleDevices;
+}
+
+function isDeviceInViewport(device, bounds) {
+  if (!bounds || !bounds.isValid()) return true;
+  if (!device.isMobile) {
+    return bounds.contains([device.estLat, device.estLon]);
+  }
+
+  // Mobile-device viewport rule: include a trail only when its latest known
+  // track point is inside the current map viewport.
+  const latestTrackPoint = device.trackPoints?.[device.trackPoints.length - 1];
+  if (latestTrackPoint) {
+    return bounds.contains([latestTrackPoint.lat, latestTrackPoint.lon]);
+  }
+  return bounds.contains([device.estLat, device.estLon]);
+}
+
+function renderViewportPanel() {
+  const visibleDevices = getVisibleEstimatedDevices();
+  const summary = {
+    total: visibleDevices.length,
+    stationary: 0,
+    mobile: 0,
+    wifi: 0,
+    bluetooth: 0,
+    cellular: 0,
+  };
+
+  for (const device of visibleDevices) {
+    if (device.isMobile) summary.mobile += 1;
+    else summary.stationary += 1;
+
+    if (device.type === 'wifi') summary.wifi += 1;
+    else if (device.type === 'bluetooth') summary.bluetooth += 1;
+    else if (device.type === 'cellular') summary.cellular += 1;
+  }
+
+  if (els.summaryVisibleTotal) els.summaryVisibleTotal.textContent = String(summary.total);
+  if (els.summaryVisibleStationary) els.summaryVisibleStationary.textContent = String(summary.stationary);
+  if (els.summaryVisibleMobile) els.summaryVisibleMobile.textContent = String(summary.mobile);
+  if (els.summaryVisibleWifi) els.summaryVisibleWifi.textContent = String(summary.wifi);
+  if (els.summaryVisibleBluetooth) els.summaryVisibleBluetooth.textContent = String(summary.bluetooth);
+  if (els.summaryVisibleCellular) els.summaryVisibleCellular.textContent = String(summary.cellular);
+
+  updateViewportSortHeaderState();
+  if (!els.viewportTableBody) return;
+
+  const sortedDevices = [...visibleDevices].sort(compareViewportDevices);
+  const rows = sortedDevices
+    .map((device) => {
+      const name = device.ssid || device.mac || 'Unknown';
+      const confidence = device.isMobile ? 'N/A (moving)' : confidenceLabel(effectiveConfidenceLevel(device));
+      const mobility = device.isMobile ? 'Mobile' : 'Stationary';
+      const trackSpan = `${Math.round(device.trackSpanMeters || 0)} m`;
+      return `
+        <tr>
+          <td>${escapeHtml(name)}</td>
+          <td>${escapeHtml(device.mac || 'Unknown')}</td>
+          <td>${escapeHtml(device.type || 'Unknown')}</td>
+          <td>${escapeHtml(String(device.obsCount || 0))}</td>
+          <td>${escapeHtml(confidence)}</td>
+          <td>${escapeHtml(mobility)}</td>
+          <td>${escapeHtml(fmtTime(device.lastSeen))}</td>
+          <td>${escapeHtml(trackSpan)}</td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  els.viewportTableBody.innerHTML =
+    rows ||
+    '<tr><td colspan="8">No visible devices match the current filters and viewport.</td></tr>';
+}
+
+function compareViewportDevices(a, b) {
+  const dir = state.viewportSortDir === 'desc' ? -1 : 1;
+  const key = state.viewportSortKey;
+  const toName = (device) => device.ssid || device.mac || '';
+  const toConfidenceRank = (device) => (device.isMobile ? -1 : effectiveConfidenceLevel(device));
+  const toMobilityText = (device) => (device.isMobile ? 'Mobile' : 'Stationary');
+
+  let left;
+  let right;
+
+  if (key === 'name') {
+    left = toName(a).toLowerCase();
+    right = toName(b).toLowerCase();
+  } else if (key === 'mac') {
+    left = String(a.mac || '').toLowerCase();
+    right = String(b.mac || '').toLowerCase();
+  } else if (key === 'type') {
+    left = String(a.type || '').toLowerCase();
+    right = String(b.type || '').toLowerCase();
+  } else if (key === 'obsCount') {
+    left = Number(a.obsCount) || 0;
+    right = Number(b.obsCount) || 0;
+  } else if (key === 'confidence') {
+    left = toConfidenceRank(a);
+    right = toConfidenceRank(b);
+  } else if (key === 'mobility') {
+    left = toMobilityText(a).toLowerCase();
+    right = toMobilityText(b).toLowerCase();
+  } else if (key === 'lastSeen') {
+    left = Number(a.lastSeen) || 0;
+    right = Number(b.lastSeen) || 0;
+  } else if (key === 'trackSpanMeters') {
+    left = Number(a.trackSpanMeters) || 0;
+    right = Number(b.trackSpanMeters) || 0;
+  } else {
+    left = Number(a.lastSeen) || 0;
+    right = Number(b.lastSeen) || 0;
+  }
+
+  if (left < right) return -1 * dir;
+  if (left > right) return 1 * dir;
+  return 0;
+}
+
+function updateViewportSortHeaderState() {
+  for (const header of els.viewportTableHeaders) {
+    const key = header.dataset.sort;
+    if (!key) continue;
+    const isActive = key === state.viewportSortKey;
+    header.setAttribute('aria-sort', isActive ? (state.viewportSortDir === 'asc' ? 'ascending' : 'descending') : 'none');
+  }
 }
 
 function passesEstimatedDeviceFilters(device) {
@@ -655,6 +842,7 @@ function refreshAllLayers() {
   redrawRoute();
   renderRawPoints();
   renderEstimatedDevices();
+  renderViewportPanel();
 }
 
 function setControlsEnabled(enabled) {
@@ -682,6 +870,7 @@ function resetMap() {
   routeTraversedLayer.setLatLngs([]);
   rawLayer.clearLayers();
   estimatedLayer.clearLayers();
+  renderViewportPanel();
 }
 
 function fmtTime(ts) {
