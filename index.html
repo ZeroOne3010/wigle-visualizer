@@ -100,6 +100,39 @@
         </div>
 
         <div id="map"></div>
+
+        <section id="viewportSummary" class="viewport-summary" aria-live="polite">
+          <h2>Visible Device Summary</h2>
+          <div class="viewport-summary-grid">
+            <p>Total visible: <strong id="summaryVisibleTotal">0</strong></p>
+            <p>Stationary: <strong id="summaryVisibleStationary">0</strong></p>
+            <p>Mobile: <strong id="summaryVisibleMobile">0</strong></p>
+            <p>Wi-Fi: <strong id="summaryVisibleWifi">0</strong></p>
+            <p>Bluetooth: <strong id="summaryVisibleBluetooth">0</strong></p>
+            <p>Cellular: <strong id="summaryVisibleCellular">0</strong></p>
+          </div>
+        </section>
+
+        <section id="viewportTableSection" class="viewport-table-wrap">
+          <h2>Visible Devices</h2>
+          <div class="table-scroll">
+            <table id="viewportTable">
+              <thead>
+                <tr>
+                  <th scope="col" data-sort="name">Name</th>
+                  <th scope="col" data-sort="mac">MAC</th>
+                  <th scope="col" data-sort="type">Type</th>
+                  <th scope="col" data-sort="obsCount">Observations</th>
+                  <th scope="col" data-sort="confidence">Confidence</th>
+                  <th scope="col" data-sort="mobility">Mobility</th>
+                  <th scope="col" data-sort="lastSeen">Last Seen</th>
+                  <th scope="col" data-sort="trackSpanMeters">Track Span</th>
+                </tr>
+              </thead>
+              <tbody id="viewportTableBody"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
     </main>
 

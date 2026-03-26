@@ -192,6 +192,113 @@ button:disabled {
   justify-content: flex-start;
 }
 
+.viewport-summary {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.viewport-summary h2,
+.viewport-table-wrap h2 {
+  margin: 0 0 6px;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+}
+
+.viewport-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 4px 8px;
+  font-size: 0.78rem;
+}
+
+.viewport-summary-grid p {
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.viewport-table-wrap {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(15, 23, 42, 0.45);
+  flex: 0 1 300px;
+  min-height: 120px;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.table-scroll {
+  overflow: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  border: 1px solid #273548;
+  border-radius: 6px;
+}
+
+#viewportTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+#viewportTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #172336;
+  color: #e2e8f0;
+  border-bottom: 1px solid #334155;
+  padding: 5px 6px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#viewportTable tbody td {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.4);
+  color: #dbe4ef;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#viewportTable tbody tr:nth-child(even) td {
+  background: rgba(30, 41, 59, 0.36);
+}
+
+#viewportTable tbody tr:hover td {
+  background: rgba(34, 211, 238, 0.1);
+}
+
+#viewportTable tbody td:nth-child(2) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.7rem;
+}
+
+#viewportTable thead th[aria-sort='ascending']::after {
+  content: ' ▲';
+  color: #22d3ee;
+}
+
+#viewportTable thead th[aria-sort='descending']::after {
+  content: ' ▼';
+  color: #22d3ee;
+}
+
+#viewportTable thead th[aria-sort='none']::after {
+  content: ' ↕';
+  color: #64748b;
+}
+
 .shape-item {
   display: inline-flex;
   align-items: center;
@@ -271,7 +378,11 @@ button:disabled {
   }
 
   #map {
-    min-height: 50vh;
+    min-height: 42vh;
+  }
+
+  .viewport-table-wrap {
+    max-height: 34vh;
   }
 }
 
