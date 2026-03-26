@@ -598,8 +598,7 @@ function compareViewportDevices(a, b) {
   const dir = state.viewportSortDir === 'desc' ? -1 : 1;
   const key = state.viewportSortKey;
   const toName = (device) => device.ssid || device.mac || '';
-  const toConfidenceText = (device) =>
-    device.isMobile ? 'N/A (moving)' : confidenceLabel(effectiveConfidenceLevel(device));
+  const toConfidenceRank = (device) => (device.isMobile ? -1 : effectiveConfidenceLevel(device));
   const toMobilityText = (device) => (device.isMobile ? 'Mobile' : 'Stationary');
 
   let left;
@@ -618,8 +617,8 @@ function compareViewportDevices(a, b) {
     left = Number(a.obsCount) || 0;
     right = Number(b.obsCount) || 0;
   } else if (key === 'confidence') {
-    left = toConfidenceText(a).toLowerCase();
-    right = toConfidenceText(b).toLowerCase();
+    left = toConfidenceRank(a);
+    right = toConfidenceRank(b);
   } else if (key === 'mobility') {
     left = toMobilityText(a).toLowerCase();
     right = toMobilityText(b).toLowerCase();
