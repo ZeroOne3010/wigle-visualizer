@@ -13,7 +13,8 @@ const state = {
     route: true,
     raw: false,
     estimated: true,
-    stationaryOnly: true,
+    stationary: true,
+    mobile: false,
     wifi: true,
     bluetooth: true,
     cellular: true,
@@ -21,6 +22,7 @@ const state = {
     minObs: 1,
   },
   deviceState: new Map(),
+  selectedDeviceMac: null,
 };
 
 const els = {
@@ -38,7 +40,8 @@ const els = {
   filterRoute: document.getElementById('filterRoute'),
   filterRaw: document.getElementById('filterRaw'),
   filterEstimated: document.getElementById('filterEstimated'),
-  filterStationaryOnly: document.getElementById('filterStationaryOnly'),
+  filterStationary: document.getElementById('filterStationary'),
+  filterMobile: document.getElementById('filterMobile'),
   filterWifi: document.getElementById('filterWifi'),
   filterBluetooth: document.getElementById('filterBluetooth'),
   filterCell: document.getElementById('filterCell'),
@@ -119,8 +122,12 @@ function wireEvents() {
     state.filters.estimated = els.filterEstimated.checked;
     renderEstimatedDevices();
   });
-  els.filterStationaryOnly.addEventListener('change', () => {
-    state.filters.stationaryOnly = els.filterStationaryOnly.checked;
+  els.filterStationary.addEventListener('change', () => {
+    state.filters.stationary = els.filterStationary.checked;
+    renderEstimatedDevices();
+  });
+  els.filterMobile.addEventListener('change', () => {
+    state.filters.mobile = els.filterMobile.checked;
     renderEstimatedDevices();
   });
   els.filterWifi.addEventListener('change', () => {
@@ -403,11 +410,34 @@ function renderEstimatedDevices() {
   estimatedLayer.clearLayers();
   if (!state.filters.estimated) return;
 
+  let selectedVisible = false;
   for (const device of state.deviceState.values()) {
     if (!passesTypeFilter(device.type)) continue;
     if (device.obsCount < state.filters.minObs) continue;
     if (device.confidenceLevel < state.filters.confidenceThreshold) continue;
-    if (state.filters.stationaryOnly && device.isMobile) continue;
+    if (device.isMobile && !state.filters.mobile) continue;
+    if (!device.isMobile && !state.filters.stationary) continue;
+
+    if (device.isMobile) {
+      const line = createMobileTrackLine(device);
+      line.bindTooltip(renderDeviceTooltip(device), {
+        className: 'device-tooltip',
+        direction: 'top',
+        sticky: true,
+        opacity: 0.95,
+      });
+      line.on('click', () => {
+        state.selectedDeviceMac = device.mac;
+        renderEstimatedDevices();
+      });
+      line.addTo(estimatedLayer);
+
+      if (device.mac === state.selectedDeviceMac) {
+        line.bringToFront();
+        selectedVisible = true;
+      }
+      continue;
+    }
 
     const style = styleForConfidence(device.confidenceLevel);
     const marker = createEstimatedMarker(device, style);
@@ -419,6 +449,33 @@ function renderEstimatedDevices() {
     });
     marker.addTo(estimatedLayer);
   }
+
+  if (!selectedVisible) {
+    state.selectedDeviceMac = null;
+  }
+}
+
+function createMobileTrackLine(device) {
+  const latLngs = buildTrackLatLngs(device.trackPoints || []);
+  const isSelected = device.mac === state.selectedDeviceMac;
+  const style = lineStyleForConfidence(device.confidenceLevel, isSelected);
+  return L.polyline(latLngs, style);
+}
+
+function buildTrackLatLngs(trackPoints) {
+  if (!trackPoints.length) return [];
+  const maxPoints = 220;
+  if (trackPoints.length <= maxPoints) return trackPoints.map((p) => [p.lat, p.lon]);
+
+  const stride = Math.ceil(trackPoints.length / maxPoints);
+  const sampled = [];
+  for (let i = 0; i < trackPoints.length; i += stride) {
+    const p = trackPoints[i];
+    sampled.push([p.lat, p.lon]);
+  }
+  const lastPoint = trackPoints[trackPoints.length - 1];
+  sampled.push([lastPoint.lat, lastPoint.lon]);
+  return sampled;
 }
 
 function createEstimatedMarker(device, style) {
@@ -469,6 +526,15 @@ function styleForConfidence(level) {
   if (level === 2) return { stroke: '#10b981', fill: '#34d399', fillOpacity: 0.62 };
   if (level === 1) return { stroke: '#f59e0b', fill: '#fbbf24', fillOpacity: 0.5 };
   return { stroke: '#ef4444', fill: '#f87171', fillOpacity: 0.3 };
+}
+
+function lineStyleForConfidence(level, selected) {
+  if (selected) {
+    return { color: '#22d3ee', weight: 7, opacity: 1, lineCap: 'round', lineJoin: 'round' };
+  }
+  if (level === 2) return { color: '#34d399', weight: 4, opacity: 0.8, lineCap: 'round', lineJoin: 'round' };
+  if (level === 1) return { color: '#fbbf24', weight: 4, opacity: 0.75, lineCap: 'round', lineJoin: 'round' };
+  return { color: '#f87171', weight: 3, opacity: 0.68, lineCap: 'round', lineJoin: 'round' };
 }
 
 function passesTypeFilter(type) {
@@ -560,6 +626,7 @@ function setStatus(msg) {
 
 function resetMap() {
   state.deviceState = new Map();
+  state.selectedDeviceMac = null;
   state.cursor = 0;
   state.activeTime = null;
   routeFullLayer.setLatLngs([]);
