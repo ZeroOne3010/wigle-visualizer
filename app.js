@@ -13,8 +13,8 @@ const state = {
     route: true,
     raw: false,
     estimated: true,
-    stationary: true,
-    mobile: false,
+    mobilityMode: 'both',
+    mobileRenderMode: 'trail',
     wifi: true,
     bluetooth: true,
     cellular: true,
@@ -42,8 +42,10 @@ const els = {
   filterRoute: document.getElementById('filterRoute'),
   filterRaw: document.getElementById('filterRaw'),
   filterEstimated: document.getElementById('filterEstimated'),
-  filterStationary: document.getElementById('filterStationary'),
-  filterMobile: document.getElementById('filterMobile'),
+  mobilityBoth: document.getElementById('mobilityBoth'),
+  mobilityStationary: document.getElementById('mobilityStationary'),
+  mobilityMobile: document.getElementById('mobilityMobile'),
+  mobileAsSymbols: document.getElementById('mobileAsSymbols'),
   filterWifi: document.getElementById('filterWifi'),
   filterBluetooth: document.getElementById('filterBluetooth'),
   filterCell: document.getElementById('filterCell'),
@@ -136,13 +138,18 @@ function wireEvents() {
     renderEstimatedDevices();
     renderViewportPanel();
   });
-  els.filterStationary.addEventListener('change', () => {
-    state.filters.stationary = els.filterStationary.checked;
-    renderEstimatedDevices();
-    renderViewportPanel();
+  [els.mobilityBoth, els.mobilityStationary, els.mobilityMobile].forEach((input) => {
+    input.addEventListener('change', () => {
+      updateMobilityModeFromInputs();
+      renderEstimatedDevices();
+      renderViewportPanel();
+    });
   });
-  els.filterMobile.addEventListener('change', () => {
-    state.filters.mobile = els.filterMobile.checked;
+  els.mobileAsSymbols.addEventListener('change', () => {
+    state.filters.mobileRenderMode = els.mobileAsSymbols.checked ? 'symbol' : 'trail';
+    if (state.filters.mobileRenderMode !== 'trail') {
+      state.selectedDeviceMac = null;
+    }
     renderEstimatedDevices();
     renderViewportPanel();
   });
@@ -482,6 +489,28 @@ function renderEstimatedDevices() {
   const hasSelectedTrail = Boolean(state.selectedDeviceMac);
   for (const device of visibleDevices) {
     if (device.isMobile) {
+      if (state.filters.mobileRenderMode === 'symbol') {
+        const marker = createMobileSymbolMarker(device);
+        marker.on('click', (event) => {
+          state.selectedDeviceMac = state.selectedDeviceMac === device.mac ? null : device.mac;
+          L.popup({ className: 'device-tooltip' })
+            .setLatLng(event.latlng)
+            .setContent(renderDeviceTooltip(device))
+            .openOn(map);
+          renderEstimatedDevices();
+        });
+        marker.bindPopup(renderDeviceTooltip(device), {
+          className: 'device-tooltip',
+        });
+        marker.addTo(estimatedLayer);
+        if (device.mac === state.selectedDeviceMac) {
+          const trail = createMobileTrackLine(device, true);
+          trail.addTo(estimatedLayer);
+          trail.bringToFront();
+        }
+        continue;
+      }
+
       const line = createMobileTrackLine(device, hasSelectedTrail);
       line.on('click', (event) => {
         state.selectedDeviceMac = state.selectedDeviceMac === device.mac ? null : device.mac;
@@ -651,9 +680,19 @@ function passesEstimatedDeviceFilters(device) {
   if (!passesTypeFilter(device.type)) return false;
   if (device.obsCount < state.filters.minObs) return false;
   if (!device.isMobile && effectiveConfidenceLevel(device) < state.filters.confidenceThreshold) return false;
-  if (device.isMobile && !state.filters.mobile) return false;
-  if (!device.isMobile && !state.filters.stationary) return false;
+  if (state.filters.mobilityMode === 'mobile' && !device.isMobile) return false;
+  if (state.filters.mobilityMode === 'stationary' && device.isMobile) return false;
   return true;
+}
+
+function updateMobilityModeFromInputs() {
+  if (els.mobilityStationary.checked) {
+    state.filters.mobilityMode = 'stationary';
+  } else if (els.mobilityMobile.checked) {
+    state.filters.mobilityMode = 'mobile';
+  } else {
+    state.filters.mobilityMode = 'both';
+  }
 }
 
 function createMobileTrackLine(device, hasSelectedTrail) {
@@ -697,6 +736,30 @@ function createEstimatedMarker(device, style) {
     ></span>`,
   });
   return L.marker(center, { icon, keyboard: false });
+}
+
+function createMobileSymbolMarker(device) {
+  const center = mobileSymbolPosition(device);
+  const baseShade = mobileShadeForDevice(device.mac);
+  const radiusPx = 7 + Math.min(10, Math.log2((device.obsCount || 0) + 1) * 1.8);
+  const diameterPx = Math.round(radiusPx * 2);
+  const markerType = markerTypeClass(device.type);
+  const icon = L.divIcon({
+    className: 'hotspot-wrapper',
+    iconSize: [diameterPx, diameterPx],
+    iconAnchor: [diameterPx / 2, diameterPx / 2],
+    html: `<span
+      class="hotspot-marker ${markerType}"
+      style="width:${diameterPx}px;height:${diameterPx}px;border-color:${baseShade};background:${baseShade};opacity:0.78"
+    ></span>`,
+  });
+  return L.marker(center, { icon, keyboard: false });
+}
+
+function mobileSymbolPosition(device) {
+  const latLngs = buildTrackLatLngs(device.trackPoints || []);
+  if (latLngs.length) return latLngs[Math.floor(latLngs.length / 2)];
+  return [device.estLat, device.estLon];
 }
 
 function renderDeviceTooltip(device) {
