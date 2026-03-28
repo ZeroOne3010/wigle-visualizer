@@ -25,6 +25,7 @@ const state = {
   selectedDeviceMac: null,
   viewportSortKey: 'lastSeen',
   viewportSortDir: 'desc',
+  ignoreNextViewportMoveEnd: false,
 };
 
 const els = {
@@ -194,9 +195,16 @@ function wireEvents() {
   }
 
   const debouncedMapViewportUpdate = debounce(() => {
+    if (state.ignoreNextViewportMoveEnd) {
+      state.ignoreNextViewportMoveEnd = false;
+      return;
+    }
     renderEstimatedDevices();
     renderViewportPanel();
   }, 150);
+  map.on('autopanstart', () => {
+    state.ignoreNextViewportMoveEnd = true;
+  });
   map.on('moveend', debouncedMapViewportUpdate);
   map.on('zoomend', debouncedMapViewportUpdate);
 }
