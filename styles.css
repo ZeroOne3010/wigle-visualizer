@@ -387,13 +387,28 @@ button:disabled {
 }
 
 
-.leaflet-tooltip.device-tooltip {
+.leaflet-tooltip.device-tooltip,
+.leaflet-popup.device-tooltip .leaflet-popup-content-wrapper {
   background: rgba(2, 6, 23, 0.94);
   border: 1px solid #334155;
   color: #f8fafc;
   box-shadow: 0 8px 24px rgba(2, 6, 23, 0.45);
 }
 
-.leaflet-tooltip.device-tooltip::before {
+.leaflet-tooltip.device-tooltip::before,
+.leaflet-popup.device-tooltip .leaflet-popup-tip {
   border-top-color: #334155;
+  background: rgba(2, 6, 23, 0.94);
+}
+
+.leaflet-popup.device-tooltip .leaflet-popup-content {
+  margin: 12px 14px;
+}
+
+.leaflet-popup.device-tooltip .leaflet-popup-close-button {
+  color: #cbd5e1;
+}
+
+.leaflet-popup.device-tooltip .leaflet-popup-close-button:hover {
+  color: #f8fafc;
 }
