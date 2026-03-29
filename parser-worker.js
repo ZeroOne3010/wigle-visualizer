@@ -17,15 +17,16 @@ self.onmessage = (event) => {
   if (event.data?.type !== 'parseCsv') return;
   const text = event.data.text || '';
   const selectedDays = Array.isArray(event.data.selectedDays) ? event.data.selectedDays : null;
+  const requestId = event.data.requestId || null;
   try {
     const result = parseWigleCsv(text, selectedDays);
     if (result?.needsDaySelection) {
-      self.postMessage({ type: 'parseNeedsDaySelection', payload: result });
+      self.postMessage({ type: 'parseNeedsDaySelection', payload: result, requestId });
     } else {
-      self.postMessage({ type: 'parseResult', payload: result });
+      self.postMessage({ type: 'parseResult', payload: result, requestId });
     }
   } catch (error) {
-    self.postMessage({ type: 'parseError', error: String(error?.message || error) });
+    self.postMessage({ type: 'parseError', error: String(error?.message || error), requestId });
   }
 };
 
@@ -49,8 +50,19 @@ function parseWigleCsv(text, selectedDays = null) {
     };
   }
 
-  const selectedDaySet =
-    selectedDays && selectedDays.length ? new Set(selectedDays.filter((value) => availableDays.includes(value))) : null;
+  const matchedSelectedDays = selectedDays?.length
+    ? selectedDays.filter((value) => availableDays.includes(value))
+    : [];
+  if (selectedDays?.length && !matchedSelectedDays.length && availableDays.length) {
+    return {
+      needsDaySelection: true,
+      availableDays,
+      latestDay: availableDays.at(-1) || null,
+      selectionInvalid: true,
+    };
+  }
+
+  const selectedDaySet = matchedSelectedDays.length ? new Set(matchedSelectedDays) : null;
 
   const observations = [];
   let skippedRows = 0;
@@ -121,7 +133,7 @@ function parseWigleCsv(text, selectedDays = null) {
       endTime: observations.at(-1)?.timestamp || null,
       availableDays,
       selectedDays:
-        selectedDaySet && selectedDaySet.size ? Array.from(selectedDaySet).sort() : availableDays.length ? [availableDays.at(-1)] : [],
+        selectedDaySet && selectedDaySet.size ? Array.from(selectedDaySet).sort() : [...availableDays],
     },
   };
 }

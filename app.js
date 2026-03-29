@@ -26,7 +26,8 @@ const state = {
   viewportSortKey: 'lastSeen',
   viewportSortDir: 'desc',
   ignoreNextViewportMoveEnd: false,
-  pendingFile: null,
+  parseRequestSeq: 0,
+  parseRequests: new Map(),
 };
 
 const els = {
@@ -222,7 +223,7 @@ function debounce(fn, waitMs = 150) {
 }
 
 async function parseFile(file) {
-  state.pendingFile = file;
+  const requestId = createParseRequest(file);
   setStatus(`Loading ${file.name}...`);
   setControlsEnabled(false);
   stopPlayback();
@@ -230,26 +231,29 @@ async function parseFile(file) {
 
   try {
     const text = await file.text();
-    worker.postMessage({ type: 'parseCsv', text });
+    worker.postMessage({ type: 'parseCsv', text, requestId });
     setStatus(`Parsing ${file.name} in background worker...`);
   } catch (error) {
+    state.parseRequests.delete(requestId);
     setStatus(`Failed to read file: ${error}`);
   }
 }
 
 function onWorkerMessage(event) {
-  const { type, payload, error } = event.data || {};
+  const { type, payload, error, requestId } = event.data || {};
   if (type === 'parseError') {
+    state.parseRequests.delete(requestId);
     setStatus(`Parse failed: ${error}`);
     return;
   }
 
   if (type === 'parseNeedsDaySelection') {
-    handleDaySelection(payload);
+    handleDaySelection(payload, requestId);
     return;
   }
 
   if (type !== 'parseResult') return;
+  state.parseRequests.delete(requestId);
 
   state.observations = payload.observations || [];
   state.route = payload.route || [];
@@ -292,19 +296,27 @@ function onWorkerMessage(event) {
   );
 }
 
-async function handleDaySelection(payload) {
+async function handleDaySelection(payload, requestId) {
   const availableDays = payload?.availableDays || [];
   const latestDay = payload?.latestDay || availableDays.at(-1) || '';
+  const file = state.parseRequests.get(requestId);
+  if (!file) {
+    return;
+  }
 
   const promptText = [
     `This file contains multiple days (${availableDays.length}).`,
     'Enter one or more dates to load (comma-separated YYYY-MM-DD),',
     'or type "all" to load everything.',
+    payload?.selectionInvalid ? 'Your previous selection did not match this file. Please choose from the list below.' : '',
     `Available days: ${availableDays.join(', ')}`,
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const response = window.prompt(promptText, latestDay);
   if (response === null) {
+    state.parseRequests.delete(requestId);
     setStatus('Day selection canceled. Choose a file again to continue.');
     return;
   }
@@ -315,15 +327,9 @@ async function handleDaySelection(payload) {
     selectedDays.push(latestDay);
   }
 
-  const file = state.pendingFile;
-  if (!file) {
-    setStatus('Could not continue parsing because the original file is no longer available.');
-    return;
-  }
-
   setStatus(`Re-parsing ${file.name} for day(s): ${selectedDays.join(', ')}`);
   const text = await file.text();
-  worker.postMessage({ type: 'parseCsv', text, selectedDays });
+  worker.postMessage({ type: 'parseCsv', text, selectedDays, requestId });
 }
 
 function parseSelectedDays(input, availableDays, latestDay) {
@@ -333,6 +339,13 @@ function parseSelectedDays(input, availableDays, latestDay) {
   const requested = normalized.split(',').map((part) => part.trim()).filter(Boolean);
   const requestedSet = new Set(requested);
   return availableDays.filter((day) => requestedSet.has(day.toLowerCase()));
+}
+
+function createParseRequest(file) {
+  state.parseRequestSeq += 1;
+  const requestId = `parse-${state.parseRequestSeq}`;
+  state.parseRequests.set(requestId, file);
+  return requestId;
 }
 
 function buildCheckpoints() {
