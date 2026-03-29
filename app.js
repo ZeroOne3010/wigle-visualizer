@@ -26,6 +26,7 @@ const state = {
   viewportSortKey: 'lastSeen',
   viewportSortDir: 'desc',
   ignoreNextViewportMoveEnd: false,
+  pendingFile: null,
 };
 
 const els = {
@@ -221,6 +222,7 @@ function debounce(fn, waitMs = 150) {
 }
 
 async function parseFile(file) {
+  state.pendingFile = file;
   setStatus(`Loading ${file.name}...`);
   setControlsEnabled(false);
   stopPlayback();
@@ -239,6 +241,11 @@ function onWorkerMessage(event) {
   const { type, payload, error } = event.data || {};
   if (type === 'parseError') {
     setStatus(`Parse failed: ${error}`);
+    return;
+  }
+
+  if (type === 'parseNeedsDaySelection') {
+    handleDaySelection(payload);
     return;
   }
 
@@ -276,11 +283,56 @@ function onWorkerMessage(event) {
     [
       `Loaded rows: ${state.metadata.rowsLoaded}`,
       `Skipped rows: ${state.metadata.rowsSkipped}`,
+      `Filtered rows (unselected days): ${state.metadata.rowsFilteredByDay || 0}`,
       `Unique devices: ${state.metadata.uniqueDevices}`,
       `Types: ${(state.metadata.types || []).join(', ') || 'none'}`,
+      `Loaded day(s): ${(state.metadata.selectedDays || []).join(', ') || 'none'}`,
       `Time range: ${fmtTime(state.metadata.startTime)} → ${fmtTime(state.metadata.endTime)}`,
     ].join('\n')
   );
+}
+
+async function handleDaySelection(payload) {
+  const availableDays = payload?.availableDays || [];
+  const latestDay = payload?.latestDay || availableDays.at(-1) || '';
+
+  const promptText = [
+    `This file contains multiple days (${availableDays.length}).`,
+    'Enter one or more dates to load (comma-separated YYYY-MM-DD),',
+    'or type "all" to load everything.',
+    `Available days: ${availableDays.join(', ')}`,
+  ].join('\n');
+
+  const response = window.prompt(promptText, latestDay);
+  if (response === null) {
+    setStatus('Day selection canceled. Choose a file again to continue.');
+    return;
+  }
+
+  const selectedDays = parseSelectedDays(response, availableDays, latestDay);
+  if (!selectedDays.length) {
+    setStatus(`No valid days selected. Defaulting to latest day: ${latestDay}.`);
+    selectedDays.push(latestDay);
+  }
+
+  const file = state.pendingFile;
+  if (!file) {
+    setStatus('Could not continue parsing because the original file is no longer available.');
+    return;
+  }
+
+  setStatus(`Re-parsing ${file.name} for day(s): ${selectedDays.join(', ')}`);
+  const text = await file.text();
+  worker.postMessage({ type: 'parseCsv', text, selectedDays });
+}
+
+function parseSelectedDays(input, availableDays, latestDay) {
+  const normalized = String(input || '').trim().toLowerCase();
+  if (!normalized) return latestDay ? [latestDay] : [];
+  if (normalized === 'all') return [...availableDays];
+  const requested = normalized.split(',').map((part) => part.trim()).filter(Boolean);
+  const requestedSet = new Set(requested);
+  return availableDays.filter((day) => requestedSet.has(day.toLowerCase()));
 }
 
 function buildCheckpoints() {

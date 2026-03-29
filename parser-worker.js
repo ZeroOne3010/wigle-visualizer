@@ -16,15 +16,20 @@ const TYPE_MAP = {
 self.onmessage = (event) => {
   if (event.data?.type !== 'parseCsv') return;
   const text = event.data.text || '';
+  const selectedDays = Array.isArray(event.data.selectedDays) ? event.data.selectedDays : null;
   try {
-    const result = parseWigleCsv(text);
-    self.postMessage({ type: 'parseResult', payload: result });
+    const result = parseWigleCsv(text, selectedDays);
+    if (result?.needsDaySelection) {
+      self.postMessage({ type: 'parseNeedsDaySelection', payload: result });
+    } else {
+      self.postMessage({ type: 'parseResult', payload: result });
+    }
   } catch (error) {
     self.postMessage({ type: 'parseError', error: String(error?.message || error) });
   }
 };
 
-function parseWigleCsv(text) {
+function parseWigleCsv(text, selectedDays = null) {
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const headerIndex = findHeaderIndex(lines);
   if (headerIndex < 0) {
@@ -33,9 +38,23 @@ function parseWigleCsv(text) {
 
   const headers = parseCsvLine(lines[headerIndex]).map((h) => h.trim());
   const idx = toIndexMap(headers);
+  const days = collectDays(lines, headerIndex, idx);
+  const availableDays = Array.from(days.keys()).sort();
+
+  if (availableDays.length > 1 && !selectedDays?.length) {
+    return {
+      needsDaySelection: true,
+      availableDays,
+      latestDay: availableDays.at(-1) || null,
+    };
+  }
+
+  const selectedDaySet =
+    selectedDays && selectedDays.length ? new Set(selectedDays.filter((value) => availableDays.includes(value))) : null;
 
   const observations = [];
   let skippedRows = 0;
+  let filteredRows = 0;
 
   for (let i = headerIndex + 1; i < lines.length; i += 1) {
     const line = lines[i];
@@ -53,9 +72,14 @@ function parseWigleCsv(text) {
     const timestamp = Date.parse(firstSeen);
     const latitude = Number(latRaw);
     const longitude = Number(lonRaw);
+    const dayKey = Number.isFinite(timestamp) ? toUtcDayKey(timestamp) : '';
 
     if (!Number.isFinite(timestamp) || !Number.isFinite(latitude) || !Number.isFinite(longitude) || !mac) {
       skippedRows += 1;
+      continue;
+    }
+    if (selectedDaySet && !selectedDaySet.has(dayKey)) {
+      filteredRows += 1;
       continue;
     }
 
@@ -90,12 +114,35 @@ function parseWigleCsv(text) {
     metadata: {
       rowsLoaded: observations.length,
       rowsSkipped: skippedRows,
+      rowsFilteredByDay: filteredRows,
       uniqueDevices,
       types,
       startTime: observations[0]?.timestamp || null,
       endTime: observations.at(-1)?.timestamp || null,
+      availableDays,
+      selectedDays:
+        selectedDaySet && selectedDaySet.size ? Array.from(selectedDaySet).sort() : availableDays.length ? [availableDays.at(-1)] : [],
     },
   };
+}
+
+function collectDays(lines, headerIndex, idx) {
+  const dayMap = new Map();
+  for (let i = headerIndex + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!line || !line.trim()) continue;
+    const row = parseCsvLine(line);
+    const firstSeen = getField(row, idx, ['FirstSeen']);
+    const timestamp = Date.parse(firstSeen);
+    if (!Number.isFinite(timestamp)) continue;
+    const dayKey = toUtcDayKey(timestamp);
+    dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + 1);
+  }
+  return dayMap;
+}
+
+function toUtcDayKey(timestampMs) {
+  return new Date(timestampMs).toISOString().slice(0, 10);
 }
 
 function findHeaderIndex(lines) {
