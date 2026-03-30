@@ -670,22 +670,40 @@ function renderViewportPanel() {
   if (!els.viewportTableBody) return;
 
   const sortedDevices = [...visibleDevices].sort(compareViewportDevices);
+  const tableColumns = [
+    'Name',
+    'MAC',
+    'Type',
+    'Observations',
+    'Confidence',
+    'Mobility',
+    'Last Seen',
+    'Track Span',
+  ];
   const rows = sortedDevices
     .map((device) => {
       const name = device.ssid || device.mac || 'Unknown';
       const confidence = device.isMobile ? 'N/A (moving)' : confidenceLabel(effectiveConfidenceLevel(device));
       const mobility = device.isMobile ? 'Mobile' : 'Stationary';
       const trackSpan = `${Math.round(device.trackSpanMeters || 0)} m`;
+      const values = [
+        name,
+        device.mac || 'Unknown',
+        device.type || 'Unknown',
+        String(device.obsCount || 0),
+        confidence,
+        mobility,
+        fmtTime(device.lastSeen),
+        trackSpan,
+      ];
       return `
         <tr>
-          <td>${escapeHtml(name)}</td>
-          <td>${escapeHtml(device.mac || 'Unknown')}</td>
-          <td>${escapeHtml(device.type || 'Unknown')}</td>
-          <td>${escapeHtml(String(device.obsCount || 0))}</td>
-          <td>${escapeHtml(confidence)}</td>
-          <td>${escapeHtml(mobility)}</td>
-          <td>${escapeHtml(fmtTime(device.lastSeen))}</td>
-          <td>${escapeHtml(trackSpan)}</td>
+          ${values
+            .map(
+              (value, index) =>
+                `<td data-label="${escapeHtml(tableColumns[index])}">${escapeHtml(value)}</td>`,
+            )
+            .join('')}
         </tr>
       `;
     })
