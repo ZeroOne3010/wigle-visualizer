@@ -5,7 +5,7 @@ const state = {
   activeTime: null,
   cursor: 0,
   isPlaying: false,
-  speed: 1,
+  speed: 4,
   rafId: null,
   lastFrameTime: null,
   checkpoints: [],
