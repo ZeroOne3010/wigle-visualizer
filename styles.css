@@ -279,6 +279,113 @@ button:disabled {
   background: rgba(34, 211, 238, 0.1);
 }
 
+@media (max-width: 860px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .top-bar,
+  .controls,
+  .map-card {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .playback {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .playback label {
+    grid-column: 1 / -1;
+  }
+
+  .viewport-table-wrap {
+    max-height: none;
+  }
+}
+
+@media (max-width: 700px) {
+  #viewportTable {
+    table-layout: auto;
+  }
+
+  #viewportTable thead {
+    display: block;
+    border-bottom: 1px solid rgba(71, 85, 105, 0.45);
+    padding: 8px;
+    background: rgba(15, 23, 42, 0.82);
+  }
+
+  #viewportTable thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  #viewportTable thead th {
+    position: static;
+    border: 1px solid rgba(71, 85, 105, 0.7);
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 0.68rem;
+    line-height: 1.2;
+    background: rgba(23, 35, 54, 0.95);
+  }
+
+  #viewportTable tbody {
+    display: grid;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  #viewportTable tbody tr {
+    display: grid;
+    gap: 3px;
+    border: 1px solid rgba(71, 85, 105, 0.5);
+    border-radius: 8px;
+    padding: 6px;
+    background: rgba(15, 23, 42, 0.7);
+  }
+
+  #viewportTable tbody td {
+    display: grid;
+    grid-template-columns: minmax(96px, 0.8fr) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 8px;
+    border-bottom: none;
+    padding: 2px 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  #viewportTable tbody td::before {
+    content: attr(data-label);
+    color: #94a3b8;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-size: 0.67rem;
+  }
+
+  #viewportTable tbody tr td:first-child {
+    font-weight: 600;
+    color: #f1f5f9;
+  }
+
+  #viewportTable tbody tr td:first-child::before {
+    color: #cbd5e1;
+  }
+
+  #viewportTable tbody tr td[colspan] {
+    display: block;
+  }
+
+  #viewportTable tbody tr td[colspan]::before {
+    content: none;
+  }
+}
+
 #viewportTable tbody td:nth-child(2) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 0.7rem;
