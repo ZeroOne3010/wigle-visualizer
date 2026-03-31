@@ -310,7 +310,26 @@ button:disabled {
   }
 
   #viewportTable thead {
-    display: none;
+    display: block;
+    border-bottom: 1px solid rgba(71, 85, 105, 0.45);
+    padding: 8px;
+    background: rgba(15, 23, 42, 0.82);
+  }
+
+  #viewportTable thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  #viewportTable thead th {
+    position: static;
+    border: 1px solid rgba(71, 85, 105, 0.7);
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 0.68rem;
+    line-height: 1.2;
+    background: rgba(23, 35, 54, 0.95);
   }
 
   #viewportTable tbody {
