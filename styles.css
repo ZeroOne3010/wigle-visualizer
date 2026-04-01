@@ -166,18 +166,18 @@ button:disabled {
 }
 
 .chip.low {
-  background: rgba(248, 113, 113, 0.25);
-  border: 1px solid #fca5a5;
+  background: rgba(100, 116, 139, 0.3);
+  border: 1px solid #94a3b8;
 }
 
 .chip.med {
-  background: rgba(251, 191, 36, 0.25);
-  border: 1px solid #fcd34d;
+  background: rgba(139, 92, 246, 0.26);
+  border: 1px solid #a78bfa;
 }
 
 .chip.high {
-  background: rgba(16, 185, 129, 0.25);
-  border: 1px solid #6ee7b7;
+  background: rgba(99, 102, 241, 0.25);
+  border: 1px solid #818cf8;
 }
 
 #map {
@@ -277,6 +277,14 @@ button:disabled {
 
 #viewportTable tbody tr:hover td {
   background: rgba(34, 211, 238, 0.1);
+}
+
+#viewportTable tbody tr[data-device-mac] {
+  cursor: pointer;
+}
+
+#viewportTable tbody tr.is-selected td {
+  background: rgba(56, 189, 248, 0.2);
 }
 
 @media (max-width: 860px) {

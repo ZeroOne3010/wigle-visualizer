@@ -531,13 +531,30 @@ function redrawRoute() {
 
 function renderRawPoints() {
   rawLayer.clearLayers();
-  if (!state.filters.raw) return;
+  if (!state.filters.raw && !state.selectedDeviceMac) return;
+
+  if (state.selectedDeviceMac) {
+    for (const obs of state.observations) {
+      if (obs.mac !== state.selectedDeviceMac) continue;
+      if (!passesTypeFilter(obs.type)) continue;
+      const color = colorForSignalStrength(obs.rssi);
+      L.circleMarker([obs.latitude, obs.longitude], {
+        radius: 3,
+        color,
+        fillColor: color,
+        opacity: 0.9,
+        fillOpacity: 0.72,
+        weight: 1,
+      }).addTo(rawLayer);
+    }
+    return;
+  }
 
   const startIndex = Math.max(0, state.cursor - 3500);
   for (let i = startIndex; i < state.cursor; i += 1) {
-    const o = state.observations[i];
-    if (!passesTypeFilter(o.type)) continue;
-    L.circleMarker([o.latitude, o.longitude], {
+    const obs = state.observations[i];
+    if (!passesTypeFilter(obs.type)) continue;
+    L.circleMarker([obs.latitude, obs.longitude], {
       radius: 2,
       color: '#94a3b8',
       opacity: 0.5,
@@ -547,62 +564,94 @@ function renderRawPoints() {
   }
 }
 
+function toggleSelectedDevice(mac) {
+  state.selectedDeviceMac = state.selectedDeviceMac === mac ? null : mac;
+  renderRawPoints();
+  renderEstimatedDevices();
+  renderViewportPanel();
+}
+
+function colorForSignalStrength(rssiValue) {
+  const rssi = Number.isFinite(rssiValue) ? rssiValue : -100;
+  const clamped = Math.max(-100, Math.min(-40, rssi));
+  const normalized = (clamped + 100) / 60;
+  const low = [239, 68, 68];
+  const mid = [234, 179, 8];
+  const high = [34, 197, 94];
+
+  const [from, to, t] =
+    normalized < 0.5
+      ? [low, mid, normalized / 0.5]
+      : [mid, high, (normalized - 0.5) / 0.5];
+  const channel = (index) => Math.round(from[index] + (to[index] - from[index]) * t);
+  return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
+}
+
 function renderEstimatedDevices() {
   estimatedLayer.clearLayers();
   if (!state.filters.estimated) return;
 
   const visibleDevices = getVisibleEstimatedDevices();
-  const selectedTrailVisible = visibleDevices.some(
-    (device) => device.mac === state.selectedDeviceMac && device.isMobile
-  );
-  if (state.selectedDeviceMac && !selectedTrailVisible) {
+  const selectedDeviceVisible = visibleDevices.some((device) => device.mac === state.selectedDeviceMac);
+  if (state.selectedDeviceMac && !selectedDeviceVisible) {
     state.selectedDeviceMac = null;
   }
 
-  const hasSelectedTrail = Boolean(state.selectedDeviceMac);
+  const hasSelectedDevice = Boolean(state.selectedDeviceMac);
   for (const device of visibleDevices) {
+    const isSelected = device.mac === state.selectedDeviceMac;
     if (device.isMobile) {
       if (state.filters.mobileRenderMode === 'symbol') {
-        const marker = createMobileSymbolMarker(device);
+        const marker = createMobileSymbolMarker(device, hasSelectedDevice, isSelected);
         marker.on('click', (event) => {
-          state.selectedDeviceMac = state.selectedDeviceMac === device.mac ? null : device.mac;
+          toggleSelectedDevice(device.mac);
           L.popup({ className: 'device-tooltip' })
             .setLatLng(event.latlng)
             .setContent(renderDeviceTooltip(device))
             .openOn(map);
-          renderEstimatedDevices();
         });
         marker.bindPopup(renderDeviceTooltip(device), {
           className: 'device-tooltip',
         });
         marker.addTo(estimatedLayer);
-        if (device.mac === state.selectedDeviceMac) {
-          const trail = createMobileTrackLine(device, true);
+        if (isSelected) {
+          const trail = createMobileTrackLine(device, hasSelectedDevice);
+          trail.on('click', () => {
+            toggleSelectedDevice(device.mac);
+          });
+          trail.bindPopup(renderDeviceTooltip(device), {
+            className: 'device-tooltip',
+          });
           trail.addTo(estimatedLayer);
           trail.bringToFront();
         }
         continue;
       }
 
-      const line = createMobileTrackLine(device, hasSelectedTrail);
+      const line = createMobileTrackLine(device, hasSelectedDevice);
       line.on('click', (event) => {
-        state.selectedDeviceMac = state.selectedDeviceMac === device.mac ? null : device.mac;
+        toggleSelectedDevice(device.mac);
         L.popup({ className: 'device-tooltip' })
           .setLatLng(event.latlng)
           .setContent(renderDeviceTooltip(device))
           .openOn(map);
-        renderEstimatedDevices();
+      });
+      line.bindPopup(renderDeviceTooltip(device), {
+        className: 'device-tooltip',
       });
       line.addTo(estimatedLayer);
 
-      if (device.mac === state.selectedDeviceMac) {
+      if (isSelected) {
         line.bringToFront();
       }
       continue;
     }
 
-    const style = styleForConfidence(effectiveConfidenceLevel(device));
+    const style = styleForConfidence(effectiveConfidenceLevel(device), hasSelectedDevice, isSelected);
     const marker = createEstimatedMarker(device, style);
+    marker.on('click', () => {
+      toggleSelectedDevice(device.mac);
+    });
     marker.bindPopup(renderDeviceTooltip(device), {
       className: 'device-tooltip',
     });
@@ -697,7 +746,7 @@ function renderViewportPanel() {
         trackSpan,
       ];
       return `
-        <tr>
+        <tr class="${device.mac === state.selectedDeviceMac ? 'is-selected' : ''}" data-device-mac="${escapeHtml(device.mac || '')}">
           ${values
             .map(
               (value, index) =>
@@ -712,6 +761,13 @@ function renderViewportPanel() {
   els.viewportTableBody.innerHTML =
     rows ||
     '<tr><td colspan="8">No visible devices match the current filters and viewport.</td></tr>';
+  for (const row of els.viewportTableBody.querySelectorAll('tr[data-device-mac]')) {
+    row.addEventListener('click', () => {
+      const mac = row.getAttribute('data-device-mac');
+      if (!mac) return;
+      toggleSelectedDevice(mac);
+    });
+  }
 }
 
 function compareViewportDevices(a, b) {
@@ -786,10 +842,10 @@ function updateMobilityModeFromInputs() {
   }
 }
 
-function createMobileTrackLine(device, hasSelectedTrail) {
+function createMobileTrackLine(device, hasSelectedDevice) {
   const latLngs = buildTrackLatLngs(device.trackPoints || []);
   const isSelected = device.mac === state.selectedDeviceMac;
-  const style = lineStyleForMobility(device.mac, isSelected, hasSelectedTrail);
+  const style = lineStyleForMobility(device.mac, isSelected, hasSelectedDevice);
   const hitTarget = L.polyline(latLngs, style.hitTarget);
   const outline = L.polyline(latLngs, style.outline);
   const core = L.polyline(latLngs, style.core);
@@ -829,9 +885,10 @@ function createEstimatedMarker(device, style) {
   return L.marker(center, { icon, keyboard: false });
 }
 
-function createMobileSymbolMarker(device) {
+function createMobileSymbolMarker(device, hasSelectedDevice, isSelected) {
   const center = mobileSymbolPosition(device);
   const baseShade = mobileShadeForDevice(device.mac);
+  const opacity = hasSelectedDevice && !isSelected ? 0.2 : 0.78;
   const radiusPx = 7 + Math.min(10, Math.log2((device.obsCount || 0) + 1) * 1.8);
   const diameterPx = Math.round(radiusPx * 2);
   const markerType = markerTypeClass(device.type);
@@ -841,7 +898,7 @@ function createMobileSymbolMarker(device) {
     iconAnchor: [diameterPx / 2, diameterPx / 2],
     html: `<span
       class="hotspot-marker ${markerType}"
-      style="width:${diameterPx}px;height:${diameterPx}px;border-color:${baseShade};background:${baseShade};opacity:0.78"
+      style="width:${diameterPx}px;height:${diameterPx}px;border-color:${baseShade};background:${baseShade};opacity:${opacity}"
     ></span>`,
   });
   return L.marker(center, { icon, keyboard: false });
@@ -882,10 +939,11 @@ function isMobileDevice(device) {
   return device.trackSpanMeters > 120 || spreadAvg > 80;
 }
 
-function styleForConfidence(level) {
-  if (level === 2) return { stroke: '#10b981', fill: '#34d399', fillOpacity: 0.62 };
-  if (level === 1) return { stroke: '#f59e0b', fill: '#fbbf24', fillOpacity: 0.5 };
-  return { stroke: '#ef4444', fill: '#f87171', fillOpacity: 0.3 };
+function styleForConfidence(level, hasSelectedDevice, isSelected) {
+  const faded = hasSelectedDevice && !isSelected;
+  if (level === 2) return { stroke: '#4f46e5', fill: '#6366f1', fillOpacity: faded ? 0.15 : 0.62 };
+  if (level === 1) return { stroke: '#7c3aed', fill: '#8b5cf6', fillOpacity: faded ? 0.15 : 0.54 };
+  return { stroke: '#334155', fill: '#64748b', fillOpacity: faded ? 0.14 : 0.42 };
 }
 
 function lineStyleForMobility(mac, selected, hasSelectedTrail) {
