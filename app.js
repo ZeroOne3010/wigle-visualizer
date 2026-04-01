@@ -595,6 +595,7 @@ function renderEstimatedDevices() {
   const selectedDeviceVisible = visibleDevices.some((device) => device.mac === state.selectedDeviceMac);
   if (state.selectedDeviceMac && !selectedDeviceVisible) {
     state.selectedDeviceMac = null;
+    renderRawPoints();
   }
 
   const hasSelectedDevice = Boolean(state.selectedDeviceMac);
