@@ -539,12 +539,12 @@ function renderRawPoints() {
       if (!passesTypeFilter(obs.type)) continue;
       const color = colorForSignalStrength(obs.rssi);
       L.circleMarker([obs.latitude, obs.longitude], {
-        radius: 3,
+        radius: 5,
         color,
         fillColor: color,
-        opacity: 0.9,
-        fillOpacity: 0.72,
-        weight: 1,
+        opacity: 0.98,
+        fillOpacity: 0.86,
+        weight: 1.5,
       }).addTo(rawLayer);
     }
     return;
@@ -555,10 +555,11 @@ function renderRawPoints() {
     const obs = state.observations[i];
     if (!passesTypeFilter(obs.type)) continue;
     L.circleMarker([obs.latitude, obs.longitude], {
-      radius: 2,
-      color: '#94a3b8',
-      opacity: 0.5,
-      fillOpacity: 0.25,
+      radius: 3.25,
+      color: '#cbd5e1',
+      fillColor: '#94a3b8',
+      opacity: 0.75,
+      fillOpacity: 0.45,
       weight: 1,
     }).addTo(rawLayer);
   }
@@ -650,11 +651,12 @@ function renderEstimatedDevices() {
 
     const style = styleForConfidence(effectiveConfidenceLevel(device), hasSelectedDevice, isSelected);
     const marker = createEstimatedMarker(device, style);
-    marker.on('click', () => {
+    marker.on('click', (event) => {
       toggleSelectedDevice(device.mac);
-    });
-    marker.bindPopup(renderDeviceTooltip(device), {
-      className: 'device-tooltip',
+      L.popup({ className: 'device-tooltip' })
+        .setLatLng(event.latlng)
+        .setContent(renderDeviceTooltip(device))
+        .openOn(map);
     });
     marker.addTo(estimatedLayer);
   }
@@ -871,7 +873,7 @@ function buildTrackLatLngs(trackPoints) {
 
 function createEstimatedMarker(device, style) {
   const center = [device.estLat, device.estLon];
-  const radiusPx = 6 + Math.min(12, Math.log2(device.obsCount + 1) * 2);
+  const radiusPx = 8 + Math.min(12, Math.log2(device.obsCount + 1) * 2.1);
   const diameterPx = Math.round(radiusPx * 2);
   const markerType = markerTypeClass(device.type);
   const icon = L.divIcon({
@@ -890,7 +892,7 @@ function createMobileSymbolMarker(device, hasSelectedDevice, isSelected) {
   const center = mobileSymbolPosition(device);
   const baseShade = mobileShadeForDevice(device.mac);
   const opacity = hasSelectedDevice && !isSelected ? 0.2 : 0.78;
-  const radiusPx = 7 + Math.min(10, Math.log2((device.obsCount || 0) + 1) * 1.8);
+  const radiusPx = 9 + Math.min(10, Math.log2((device.obsCount || 0) + 1) * 1.8);
   const diameterPx = Math.round(radiusPx * 2);
   const markerType = markerTypeClass(device.type);
   const icon = L.divIcon({
@@ -942,9 +944,9 @@ function isMobileDevice(device) {
 
 function styleForConfidence(level, hasSelectedDevice, isSelected) {
   const faded = hasSelectedDevice && !isSelected;
-  if (level === 2) return { stroke: '#4f46e5', fill: '#6366f1', fillOpacity: faded ? 0.15 : 0.62 };
-  if (level === 1) return { stroke: '#7c3aed', fill: '#8b5cf6', fillOpacity: faded ? 0.15 : 0.54 };
-  return { stroke: '#334155', fill: '#64748b', fillOpacity: faded ? 0.14 : 0.42 };
+  if (level === 2) return { stroke: faded ? '#3730a3' : '#4f46e5', fill: '#6366f1', fillOpacity: faded ? 0.12 : 0.62 };
+  if (level === 1) return { stroke: faded ? '#5b21b6' : '#7c3aed', fill: '#8b5cf6', fillOpacity: faded ? 0.12 : 0.54 };
+  return { stroke: faded ? '#1e293b' : '#334155', fill: '#64748b', fillOpacity: faded ? 0.11 : 0.42 };
 }
 
 function lineStyleForMobility(mac, selected, hasSelectedTrail) {
