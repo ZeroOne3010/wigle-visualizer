@@ -457,6 +457,44 @@ button:disabled {
   color: #f8fafc;
 }
 
+.signal-details {
+  margin-top: 8px;
+  border-top: 1px solid rgba(71, 85, 105, 0.45);
+  padding-top: 6px;
+}
+
+.signal-details summary {
+  cursor: pointer;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+}
+
+.signal-details ol {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 150px;
+  overflow: auto;
+}
+
+.signal-details li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+  padding: 2px 0;
+  font-size: 0.75rem;
+}
+
+.signal-details li:last-child {
+  border-bottom: none;
+}
+
+.signal-details strong {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
 .hotspot-wrapper {
   background: transparent;
   border: 0;

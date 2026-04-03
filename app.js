@@ -374,6 +374,7 @@ function cloneDeviceState(deviceMap) {
       firstSeen: d.firstSeen,
       lastSeen: d.lastSeen,
       trackPoints: (d.trackPoints || []).map((point) => ({ ...point })),
+      signalSamples: (d.signalSamples || []).map((sample) => ({ ...sample })),
     });
   }
   return copy;
@@ -452,6 +453,10 @@ function applyObservation(obs, deviceMap) {
     existing.trackSpanMeters = Math.max(existing.trackSpanMeters, span);
   }
   existing.trackPoints.push({ lat: obs.latitude, lon: obs.longitude });
+  existing.signalSamples.push({
+    timestamp: obs.timestamp,
+    rssi: Number.isFinite(obs.rssi) ? obs.rssi : null,
+  });
 
   const spread = distanceMeters(existing.estLat, existing.estLon, obs.latitude, obs.longitude);
   existing.varianceAccumulator += spread;
@@ -475,6 +480,7 @@ function createNewDevice(obs) {
     varianceAccumulator: 0,
     trackSpanMeters: 0,
     trackPoints: [{ lat: obs.latitude, lon: obs.longitude }],
+    signalSamples: [],
     latestRssi: obs.rssi,
     latestAccuracy: obs.accuracy,
     confidenceLevel: 0,
@@ -574,17 +580,32 @@ function toggleSelectedDevice(mac) {
 
 function colorForSignalStrength(rssiValue) {
   const rssi = Number.isFinite(rssiValue) ? rssiValue : -100;
-  const clamped = Math.max(-100, Math.min(-40, rssi));
-  const normalized = (clamped + 100) / 60;
-  const low = [239, 68, 68];
-  const mid = [234, 179, 8];
-  const high = [34, 197, 94];
+  const clamped = Math.max(-96, Math.min(-38, rssi));
+  const normalized = (clamped + 96) / 58;
+  const emphasized = Math.pow(normalized, 0.65);
 
-  const [from, to, t] =
-    normalized < 0.5
-      ? [low, mid, normalized / 0.5]
-      : [mid, high, (normalized - 0.5) / 0.5];
-  const channel = (index) => Math.round(from[index] + (to[index] - from[index]) * t);
+  const stops = [
+    { t: 0, rgb: [180, 24, 26] },
+    { t: 0.2, rgb: [242, 94, 34] },
+    { t: 0.4, rgb: [246, 181, 33] },
+    { t: 0.6, rgb: [132, 204, 22] },
+    { t: 0.8, rgb: [34, 211, 238] },
+    { t: 1, rgb: [37, 99, 235] },
+  ];
+
+  let lower = stops[0];
+  let upper = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i += 1) {
+    if (emphasized >= stops[i].t && emphasized <= stops[i + 1].t) {
+      lower = stops[i];
+      upper = stops[i + 1];
+      break;
+    }
+  }
+
+  const span = Math.max(0.0001, upper.t - lower.t);
+  const t = (emphasized - lower.t) / span;
+  const channel = (index) => Math.round(lower.rgb[index] + (upper.rgb[index] - lower.rgb[index]) * t);
   return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`;
 }
 
@@ -924,6 +945,19 @@ function renderDeviceTooltip(device) {
   const observations = Number.isFinite(device.obsCount) ? String(device.obsCount) : '0';
   const mobility = device.isMobile ? 'Mobile' : 'Stationary';
   const trackSpan = `${Math.round(device.trackSpanMeters || 0)} m`;
+  const signalSamples = Array.isArray(device.signalSamples) ? device.signalSamples : [];
+
+  const signalRows = signalSamples.length
+    ? signalSamples
+        .slice(-40)
+        .reverse()
+        .map((sample, index) => {
+          const sampleNo = signalSamples.length - index;
+          const rssiText = Number.isFinite(sample.rssi) ? `${Math.round(sample.rssi)} dBm` : 'Unknown';
+          return `<li><span>#${sampleNo}</span><strong>${escapeHtml(rssiText)}</strong></li>`;
+        })
+        .join('')
+    : '<li><span>No signal samples available.</span></li>';
 
   return `
     <dl class="popup-grid">
@@ -934,12 +968,21 @@ function renderDeviceTooltip(device) {
       <dt>Confidence</dt><dd>${escapeHtml(confidence)}</dd>
       <dt>Observations</dt><dd>${escapeHtml(observations)}</dd>
     </dl>
+    <details class="signal-details">
+      <summary>Observation signals (${escapeHtml(observations)})</summary>
+      <ol>${signalRows}</ol>
+    </details>
   `;
 }
 
+
 function isMobileDevice(device) {
-  const spreadAvg = device.obsCount ? device.varianceAccumulator / device.obsCount : 0;
-  return device.trackSpanMeters > 120 || spreadAvg > 80;
+  const obsCount = Number(device.obsCount) || 0;
+  const spreadAvg = obsCount ? device.varianceAccumulator / obsCount : 0;
+
+  if (spreadAvg > 120) return true;
+  if (obsCount < 5) return device.trackSpanMeters > 180;
+  return device.trackSpanMeters > 260 && spreadAvg > 55;
 }
 
 function styleForConfidence(level, hasSelectedDevice, isSelected) {
