@@ -374,6 +374,7 @@ function cloneDeviceState(deviceMap) {
       firstSeen: d.firstSeen,
       lastSeen: d.lastSeen,
       trackPoints: (d.trackPoints || []).map((point) => ({ ...point })),
+      signalSamples: (d.signalSamples || []).map((sample) => ({ ...sample })),
     });
   }
   return copy;
