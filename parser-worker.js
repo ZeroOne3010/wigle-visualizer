@@ -157,10 +157,11 @@ function applyPlaybackTimeline(observations) {
   for (let i = 1; i < observations.length; i += 1) {
     const gapMs = Math.max(0, observations[i].timestamp - observations[i - 1].timestamp);
     if (gapMs > GAP_COLLAPSE_THRESHOLD_MS) {
-      collapsedGapMs += gapMs;
+      collapsedGapMs += Math.max(0, gapMs - 1);
       collapsedGapCount += 1;
+      playbackTime += 1;
     } else {
-      playbackTime += gapMs;
+      playbackTime += Math.max(1, gapMs);
     }
     observations[i].playbackTime = playbackTime;
   }

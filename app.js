@@ -1147,18 +1147,28 @@ function realTimestampForPlayback(playbackTime) {
   if (!state.observations.length) return null;
   let left = 0;
   let right = state.observations.length - 1;
-  let best = 0;
+  let firstAfter = state.observations.length;
   while (left <= right) {
     const mid = (left + right) >> 1;
     const midTime = observationPlaybackTime(state.observations[mid]);
-    if (midTime <= playbackTime) {
-      best = mid;
-      left = mid + 1;
-    } else {
+    if (midTime >= playbackTime) {
+      firstAfter = mid;
       right = mid - 1;
+    } else {
+      left = mid + 1;
     }
   }
-  return state.observations[best]?.timestamp ?? playbackTime;
+
+  if (firstAfter <= 0) return state.observations[0]?.timestamp ?? playbackTime;
+  if (firstAfter >= state.observations.length) return state.observations.at(-1)?.timestamp ?? playbackTime;
+
+  const prev = state.observations[firstAfter - 1];
+  const next = state.observations[firstAfter];
+  const prevPlayback = observationPlaybackTime(prev);
+  const nextPlayback = observationPlaybackTime(next);
+  const playbackSpan = Math.max(1, nextPlayback - prevPlayback);
+  const ratio = Math.max(0, Math.min(1, (playbackTime - prevPlayback) / playbackSpan));
+  return prev.timestamp + (next.timestamp - prev.timestamp) * ratio;
 }
 
 function fmtTime(ts) {
