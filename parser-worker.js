@@ -12,6 +12,7 @@ const TYPE_MAP = {
   nr: 'cellular',
   '5g': 'cellular',
 };
+const GAP_COLLAPSE_THRESHOLD_MS = 2 * 60 * 1000;
 
 self.onmessage = (event) => {
   if (event.data?.type !== 'parseCsv') return;
@@ -115,6 +116,7 @@ function parseWigleCsv(text, selectedDays = null) {
   }
 
   observations.sort((a, b) => a.timestamp - b.timestamp || a.rowIndex - b.rowIndex);
+  const { collapsedGapMs, collapsedGapCount } = applyPlaybackTimeline(observations);
 
   const route = observations.map((o) => ({ timestamp: o.timestamp, latitude: o.latitude, longitude: o.longitude }));
   const types = Array.from(new Set(observations.map((o) => o.type)));
@@ -131,11 +133,40 @@ function parseWigleCsv(text, selectedDays = null) {
       types,
       startTime: observations[0]?.timestamp || null,
       endTime: observations.at(-1)?.timestamp || null,
+      playbackStartTime: observations[0]?.playbackTime || null,
+      playbackEndTime: observations.at(-1)?.playbackTime || null,
+      collapsedGapMs,
+      collapsedGapCount,
       availableDays,
       selectedDays:
         selectedDaySet && selectedDaySet.size ? Array.from(selectedDaySet).sort() : [...availableDays],
     },
   };
+}
+
+function applyPlaybackTimeline(observations) {
+  if (!observations.length) {
+    return { collapsedGapMs: 0, collapsedGapCount: 0 };
+  }
+
+  let playbackTime = observations[0].timestamp;
+  let collapsedGapMs = 0;
+  let collapsedGapCount = 0;
+  observations[0].playbackTime = playbackTime;
+
+  for (let i = 1; i < observations.length; i += 1) {
+    const gapMs = Math.max(0, observations[i].timestamp - observations[i - 1].timestamp);
+    if (gapMs > GAP_COLLAPSE_THRESHOLD_MS) {
+      collapsedGapMs += Math.max(0, gapMs - 1);
+      collapsedGapCount += 1;
+      playbackTime += 1;
+    } else {
+      playbackTime += Math.max(1, gapMs);
+    }
+    observations[i].playbackTime = playbackTime;
+  }
+
+  return { collapsedGapMs, collapsedGapCount };
 }
 
 function collectDays(lines, headerIndex, idx) {

@@ -265,12 +265,14 @@ function onWorkerMessage(event) {
   }
 
   buildCheckpoints();
-  seekToTime(state.metadata.startTime);
+  const playbackStart = state.metadata.playbackStartTime ?? state.metadata.startTime;
+  const playbackEnd = state.metadata.playbackEndTime ?? state.metadata.endTime;
+  seekToTime(playbackStart);
 
-  els.timeline.min = String(state.metadata.startTime);
-  els.timeline.max = String(state.metadata.endTime);
+  els.timeline.min = String(playbackStart);
+  els.timeline.max = String(playbackEnd);
   els.timeline.step = '1';
-  els.timeline.value = String(state.metadata.startTime);
+  els.timeline.value = String(playbackStart);
 
   els.timeStart.textContent = fmtTime(state.metadata.startTime);
   els.timeEnd.textContent = fmtTime(state.metadata.endTime);
@@ -292,6 +294,7 @@ function onWorkerMessage(event) {
       `Types: ${(state.metadata.types || []).join(', ') || 'none'}`,
       `Loaded day(s): ${(state.metadata.selectedDays || []).join(', ') || 'none'}`,
       `Time range: ${fmtTime(state.metadata.startTime)} → ${fmtTime(state.metadata.endTime)}`,
+      `Collapsed idle gaps: ${state.metadata.collapsedGapCount || 0} (${fmtDuration(state.metadata.collapsedGapMs || 0)})`,
     ].join('\n')
   );
 }
@@ -358,7 +361,7 @@ function buildCheckpoints() {
     if (i % interval === 0) {
       state.checkpoints.push({
         obsIndex: i,
-        time: state.observations[i].timestamp,
+        time: observationPlaybackTime(state.observations[i]),
         snapshot: cloneDeviceState(deviceState),
       });
     }
@@ -383,8 +386,10 @@ function cloneDeviceState(deviceMap) {
 function seekToTime(targetTime) {
   if (!state.observations.length) return;
 
-  const clamped = Math.min(Math.max(targetTime, state.metadata.startTime), state.metadata.endTime);
-  const currentTime = state.activeTime ?? state.metadata.startTime;
+  const playbackStart = state.metadata.playbackStartTime ?? state.metadata.startTime;
+  const playbackEnd = state.metadata.playbackEndTime ?? state.metadata.endTime;
+  const clamped = Math.min(Math.max(targetTime, playbackStart), playbackEnd);
+  const currentTime = state.activeTime ?? playbackStart;
 
   if (clamped >= currentTime) {
     advanceForward(clamped);
@@ -394,7 +399,7 @@ function seekToTime(targetTime) {
 
   state.activeTime = clamped;
   els.timeline.value = String(clamped);
-  els.timeCurrent.textContent = fmtTime(clamped);
+  els.timeCurrent.textContent = fmtTime(realTimestampForPlayback(clamped));
 
   redrawRoute();
   renderRawPoints();
@@ -403,7 +408,7 @@ function seekToTime(targetTime) {
 }
 
 function advanceForward(targetTime) {
-  while (state.cursor < state.observations.length && state.observations[state.cursor].timestamp <= targetTime) {
+  while (state.cursor < state.observations.length && observationPlaybackTime(state.observations[state.cursor]) <= targetTime) {
     applyObservation(state.observations[state.cursor], state.deviceState);
     state.cursor += 1;
   }
@@ -419,7 +424,7 @@ function rewindTo(targetTime) {
     state.cursor = 0;
   }
 
-  while (state.cursor < state.observations.length && state.observations[state.cursor].timestamp <= targetTime) {
+  while (state.cursor < state.observations.length && observationPlaybackTime(state.observations[state.cursor]) <= targetTime) {
     applyObservation(state.observations[state.cursor], state.deviceState);
     state.cursor += 1;
   }
@@ -1077,10 +1082,12 @@ function tick(frameTime) {
   state.lastFrameTime = frameTime;
 
   const advanceMs = dt * state.speed;
-  const nextTime = Math.min((state.activeTime ?? state.metadata.startTime) + advanceMs, state.metadata.endTime);
+  const playbackStart = state.metadata.playbackStartTime ?? state.metadata.startTime;
+  const playbackEnd = state.metadata.playbackEndTime ?? state.metadata.endTime;
+  const nextTime = Math.min((state.activeTime ?? playbackStart) + advanceMs, playbackEnd);
   seekToTime(nextTime);
 
-  if (nextTime >= state.metadata.endTime) {
+  if (nextTime >= playbackEnd) {
     stopPlayback();
     return;
   }
@@ -1092,7 +1099,7 @@ function stepBy(direction) {
   if (!state.observations.length) return;
 
   const targetIndex = direction > 0 ? Math.min(state.cursor, state.observations.length - 1) : Math.max(0, state.cursor - 2);
-  const targetTime = state.observations[targetIndex]?.timestamp;
+  const targetTime = observationPlaybackTime(state.observations[targetIndex]);
   if (targetTime != null) seekToTime(targetTime);
 }
 
@@ -1131,9 +1138,52 @@ function resetMap() {
   renderViewportPanel();
 }
 
+function observationPlaybackTime(observation) {
+  if (!observation) return null;
+  return observation.playbackTime ?? observation.timestamp;
+}
+
+function realTimestampForPlayback(playbackTime) {
+  if (!state.observations.length) return null;
+  let left = 0;
+  let right = state.observations.length - 1;
+  let firstAfter = state.observations.length;
+  while (left <= right) {
+    const mid = (left + right) >> 1;
+    const midTime = observationPlaybackTime(state.observations[mid]);
+    if (midTime >= playbackTime) {
+      firstAfter = mid;
+      right = mid - 1;
+    } else {
+      left = mid + 1;
+    }
+  }
+
+  if (firstAfter <= 0) return state.observations[0]?.timestamp ?? playbackTime;
+  if (firstAfter >= state.observations.length) return state.observations.at(-1)?.timestamp ?? playbackTime;
+
+  const prev = state.observations[firstAfter - 1];
+  const next = state.observations[firstAfter];
+  const prevPlayback = observationPlaybackTime(prev);
+  const nextPlayback = observationPlaybackTime(next);
+  const playbackSpan = Math.max(1, nextPlayback - prevPlayback);
+  const ratio = Math.max(0, Math.min(1, (playbackTime - prevPlayback) / playbackSpan));
+  return prev.timestamp + (next.timestamp - prev.timestamp) * ratio;
+}
+
 function fmtTime(ts) {
   if (!ts) return '--';
   return new Date(ts).toLocaleString();
+}
+
+function fmtDuration(ms) {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }
 
 function distanceMeters(lat1, lon1, lat2, lon2) {
