@@ -16,3 +16,6 @@ WiGLE Visualizer is a browser-based playback tool for WiGLE CSV exports. It pars
 You can use it directly at:
 
 https://zeroone3010.github.io/wigle-visualizer/
+
+---
+✨ Made with vibes ✨
